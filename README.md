@@ -19,12 +19,12 @@ Implementiert ist die technische Grundstruktur:
 * sicherer Bild-Upload fuer JPEG/PNG mit Pillow-Validierung
 * Speicherung von Upload-Metadaten und Dateien unter `storage/users/<user_id>/tools/<tool_id>/source/`
 * OpenCV-basierte DIN-A4-Erkennung mit markierter Vorschau unter `processed/`
-* Platzhalter fuer Perspektivkorrektur, Segmentierungsbackends, Layout- und SVG-Exportservices
+* Perspektivkorrektur erkannter DIN-A4-Blaetter mit konfigurierbarer Pixel-pro-Millimeter-Skalierung
+* Platzhalter fuer Segmentierungsbackends, Layout- und SVG-Exportservices
 * automatisierte Basistests
 
 Noch nicht implementiert:
 
-* Perspektivkorrektur
 * Werkzeugsegmentierung
 * Konturerkennung
 * interaktiver Kontureditor

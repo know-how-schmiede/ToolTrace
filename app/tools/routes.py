@@ -112,7 +112,22 @@ def detail(tool_id: int):
         .order_by(ProcessedImage.created_at.desc())
         .all()
     )
-    return render_template("tools/detail.html", tool=tool, upload_form=upload_form, page_previews=page_previews)
+    perspective_previews = (
+        ProcessedImage.query.join(ProcessedImage.processing_job)
+        .filter(
+            ProcessedImage.image_type == "perspective_corrected",
+            ProcessedImage.processing_job.has(tool_id=tool.id),
+        )
+        .order_by(ProcessedImage.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "tools/detail.html",
+        tool=tool,
+        upload_form=upload_form,
+        page_previews=page_previews,
+        perspective_previews=perspective_previews,
+    )
 
 
 @bp.post("/<int:tool_id>/delete")

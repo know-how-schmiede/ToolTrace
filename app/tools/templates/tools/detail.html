@@ -43,6 +43,16 @@
       {% endif %}
     </section>
     <section class="mb-4">
+      <h2 class="h4">Perspektivkorrektur</h2>
+      {% if perspective_previews %}
+        {% set perspective_preview = perspective_previews[0] %}
+        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=perspective_preview.id) }}" alt="Perspektivisch entzerrtes DIN-A4-Bild">
+        <p class="text-secondary mt-2 mb-0">{{ perspective_preview.width_px }} x {{ perspective_preview.height_px }} px</p>
+      {% else %}
+        <p class="text-secondary">Noch keine Perspektivkorrektur ausgefuehrt.</p>
+      {% endif %}
+    </section>
+    <section class="mb-4">
       <h2 class="h4">Metadaten</h2>
       <dl class="row">
         <dt class="col-sm-4">Einsatzzweck</dt><dd class="col-sm-8">{{ tool.purpose }}</dd>

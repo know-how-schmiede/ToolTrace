@@ -1,5 +1,13 @@
 # ToolTrace Timeline
 
+## 0.2.3 - 2026-07-04
+
+### Geaendert
+
+* Perspektivkorrektur fuer erkannte DIN-A4-Blaetter umgesetzt.
+* Entzerrtes DIN-A4-Bild wird in konfigurierter Pixel-pro-Millimeter-Skalierung gespeichert.
+* Werkzeugdetailseite zeigt die perspektivisch korrigierte Vorschau an.
+
 ## 0.2.2 - 2026-07-04
 
 ### Geaendert

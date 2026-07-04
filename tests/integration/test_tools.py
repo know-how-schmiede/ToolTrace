@@ -73,8 +73,9 @@ def test_image_upload_stores_metadata_and_placeholder_job(client, app):
         assert source_image.width_px == 800
         assert source_image.mime_type == "image/png"
         assert job.status == "completed_with_warning"
-        assert job.current_step == "detect_page"
+        assert job.current_step == "correct_perspective"
         assert source_image.page_detection_score is not None
+        assert ProcessedImage.query.filter_by(image_type="perspective_corrected").count() == 1
 
 
 def test_user_can_create_tool_with_initial_image_upload(client, app):
@@ -102,6 +103,7 @@ def test_user_can_create_tool_with_initial_image_upload(client, app):
         job = ProcessingJob.query.filter_by(tool_id=tool.id).one()
         assert source_image.original_filename == "schraubendreher.png"
         assert job.status == "completed_with_warning"
+        assert job.current_step == "correct_perspective"
 
 
 def test_tool_library_renders_thumbnail_and_image_route(client, app):
@@ -134,10 +136,15 @@ def test_tool_library_renders_thumbnail_and_image_route(client, app):
 
     with app.app_context():
         processed_image = ProcessedImage.query.filter_by(image_type="page_detected").one()
+        perspective_image = ProcessedImage.query.filter_by(image_type="perspective_corrected").one()
 
     processed_response = client.get(f"/tools/{tool.id}/processed-images/{processed_image.id}")
     assert processed_response.status_code == 200
     assert processed_response.mimetype == "image/png"
+
+    perspective_response = client.get(f"/tools/{tool.id}/processed-images/{perspective_image.id}")
+    assert perspective_response.status_code == 200
+    assert perspective_response.mimetype == "image/png"
 
 
 def test_small_image_upload_is_saved_with_warning(client, app):

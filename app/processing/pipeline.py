@@ -8,6 +8,7 @@ from flask import current_app
 from app.extensions import db
 from app.models import ProcessedImage, ProcessingJob, SourceImage, Tool
 from app.processing.page_detection import PageDetectionService
+from app.processing.perspective import PerspectiveCorrectionService
 
 
 class ToolProcessingPipeline:
@@ -82,11 +83,39 @@ class ToolProcessingPipeline:
         db.session.add(processed_image)
 
         if result.found:
+            job.current_step = "correct_perspective"
+            job.progress_percent = 40
+            db.session.commit()
+
+            corrected_path = (
+                storage_root
+                / "users"
+                / str(job.user_id)
+                / "tools"
+                / str(job.tool_id)
+                / "processed"
+                / f"perspective_corrected_job_{job.id}.png"
+            )
+            correction = PerspectiveCorrectionService().correct(
+                source_path,
+                result.corners,
+                corrected_path,
+                current_app.config["PROCESSING_PIXELS_PER_MM"],
+            )
+            db.session.add(
+                ProcessedImage(
+                    processing_job_id=job.id,
+                    image_type="perspective_corrected",
+                    file_path=corrected_path.relative_to(storage_root).as_posix(),
+                    width_px=correction.width_px,
+                    height_px=correction.height_px,
+                )
+            )
             job.status = "completed_with_warning"
-            job.current_step = "detect_page"
-            job.progress_percent = 35
+            job.current_step = "correct_perspective"
+            job.progress_percent = 50
             job.error_code = None
-            job.error_message = "DIN-A4-Blatt erkannt. Perspektivkorrektur ist der naechste Verarbeitungsschritt."
+            job.error_message = "DIN-A4-Blatt erkannt und perspektivisch entzerrt. Segmentierung ist der naechste Verarbeitungsschritt."
             job.tool.status = "processing"
         else:
             job.status = "failed"
