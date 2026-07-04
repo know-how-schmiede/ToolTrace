@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}ToolTrace starten{% endblock %}
+{% block content %}
+<section class="py-5">
+  <div class="row align-items-center g-4">
+    <div class="col-lg-7">
+      <h1 class="display-5 fw-semibold">ToolTrace</h1>
+      <p class="lead">Werkzeugkonturen aus Fotos erfassen, verwalten und spaeter masshaltig exportieren.</p>
+      <p class="text-secondary">Die erste Entwicklungsstufe stellt Benutzerkonten, Werkzeugbibliothek, sicheren Bild-Upload und die vorbereitete Verarbeitungspipeline bereit.</p>
+      <div class="d-flex gap-2">
+        <a class="btn btn-primary" href="{{ url_for('auth.register') }}">Konto erstellen</a>
+        <a class="btn btn-outline-primary" href="{{ url_for('auth.login') }}">Anmelden</a>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="workflow-panel">
+        <div>Foto auf DIN-A4-Blatt</div>
+        <div>Upload und Metadaten</div>
+        <div>Pipeline-Platzhalter</div>
+        <div>Bibliothek</div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ tool.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h1>{{ tool.name }}</h1>
+    <p class="text-secondary mb-0">{{ tool.category.name if tool.category else "Keine Kategorie" }} · {{ tool.status }}</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('tools.index') }}">Zur Bibliothek</a>
+</div>
+<div class="row g-4">
+  <div class="col-lg-7">
+    <section class="mb-4">
+      <h2 class="h4">Metadaten</h2>
+      <dl class="row">
+        <dt class="col-sm-4">Einsatzzweck</dt><dd class="col-sm-8">{{ tool.purpose }}</dd>
+        <dt class="col-sm-4">Hersteller</dt><dd class="col-sm-8">{{ tool.manufacturer or "-" }}</dd>
+        <dt class="col-sm-4">Modell</dt><dd class="col-sm-8">{{ tool.model or "-" }}</dd>
+        <dt class="col-sm-4">Lagerort</dt><dd class="col-sm-8">{{ tool.storage_location or "-" }}</dd>
+      </dl>
+    </section>
+    <section>
+      <h2 class="h4">Bilder</h2>
+      {% if tool.source_images %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead><tr><th>Datei</th><th>Groesse</th><th>Format</th><th>Upload</th></tr></thead>
+            <tbody>
+              {% for image in tool.source_images %}
+                <tr>
+                  <td>{{ image.original_filename }}</td>
+                  <td>{{ image.width_px }} x {{ image.height_px }} px</td>
+                  <td>{{ image.mime_type }}</td>
+                  <td>{{ image.uploaded_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-secondary">Noch kein Bild hochgeladen.</p>
+      {% endif %}
+    </section>
+  </div>
+  <div class="col-lg-5">
+    <div class="upload-panel">
+      <h2 class="h4">Bild hochladen</h2>
+      <p class="text-secondary">Ein Werkzeug auf vollstaendig sichtbarem DIN-A4-Blatt, JPEG oder PNG.</p>
+      <form method="post" enctype="multipart/form-data">
+        {{ upload_form.hidden_tag() }}
+        {{ upload_form.image.label(class="form-label") }}
+        {{ upload_form.image(class="form-control") }}
+        {% for error in upload_form.image.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        <button class="btn btn-primary mt-3" type="submit">Hochladen</button>
+      </form>
+    </div>
+    <div class="mt-4">
+      <h2 class="h4">Verarbeitungshistorie</h2>
+      {% if tool.processing_jobs %}
+        <ul class="list-group">
+          {% for job in tool.processing_jobs %}
+            <li class="list-group-item d-flex justify-content-between">
+              <span>{{ job.current_step }}</span>
+              <span class="badge text-bg-secondary">{{ job.status }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-secondary">Noch kein Verarbeitungsauftrag vorhanden.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

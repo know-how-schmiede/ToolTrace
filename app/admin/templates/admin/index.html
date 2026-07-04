@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Administration{% endblock %}
+{% block content %}
+<h1>Administration</h1>
+<div class="row g-3">
+  <div class="col-md-4"><div class="metric"><span>{{ users_count }}</span><small>Benutzer</small></div></div>
+  <div class="col-md-4"><div class="metric"><span>{{ categories_count }}</span><small>Kategorien</small></div></div>
+  <div class="col-md-4"><div class="metric"><span>{{ jobs_count }}</span><small>Jobs</small></div></div>
+</div>
+{% endblock %}

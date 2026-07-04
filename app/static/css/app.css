@@ -1,0 +1,79 @@
+body {
+  background: #f8fafc;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell main {
+  flex: 1;
+}
+
+.app-footer {
+  background: #fff;
+  color: #344054;
+}
+
+.app-footer a {
+  color: #344054;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  color: #0d6efd;
+  text-decoration: underline;
+}
+
+.form-shell {
+  max-width: 520px;
+}
+
+.form-shell-wide {
+  max-width: 860px;
+}
+
+.metric,
+.tool-card,
+.upload-panel,
+.workflow-panel {
+  background: #fff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.metric span {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.metric small {
+  color: #5f6b7a;
+}
+
+.workflow-panel {
+  display: grid;
+  gap: .75rem;
+}
+
+.workflow-panel div {
+  border-left: 4px solid #0d6efd;
+  padding: .75rem;
+  background: #f4f8ff;
+}
+
+.legal-page {
+  max-width: 860px;
+}
+
+.placeholder-box {
+  background: #fff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
