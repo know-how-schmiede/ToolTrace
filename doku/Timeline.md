@@ -1,5 +1,14 @@
 # ToolTrace Timeline
 
+## 0.5.0 - 2026-07-04
+
+### Geaendert
+
+* Erkannte Aussenkontur wird in ein eigenes Werkzeug-Koordinatensystem ueberfuehrt.
+* Kontur wird ueber die minimale rotierte Bounding Box ausgerichtet, die lange Achse liegt parallel zur X-Achse.
+* Ursprung der Konturgeometrie liegt links unten; alle gespeicherten Koordinaten sind positive Millimeterwerte.
+* Originale Pixelkontur bleibt als Quellreferenz in den Geometriedaten erhalten.
+
 ## 0.4.0 - 2026-07-04
 
 ### Geaendert

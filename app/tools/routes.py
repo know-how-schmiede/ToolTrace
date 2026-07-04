@@ -6,7 +6,7 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import ProcessedImage, SourceImage, Tool, ToolCategory
+from app.models import Contour, ProcessedImage, SourceImage, Tool, ToolCategory
 from app.processing.pipeline import ToolProcessingPipeline
 
 from .forms import ToolForm, UploadImageForm
@@ -133,6 +133,16 @@ def detail(tool_id: int):
         .order_by(ProcessedImage.created_at.desc())
         .all()
     )
+    aligned_contour_previews = (
+        ProcessedImage.query.join(ProcessedImage.processing_job)
+        .filter(
+            ProcessedImage.image_type == "aligned_contour_preview",
+            ProcessedImage.processing_job.has(tool_id=tool.id),
+        )
+        .order_by(ProcessedImage.created_at.desc())
+        .all()
+    )
+    active_contour = Contour.query.filter_by(tool_id=tool.id, is_active=True).order_by(Contour.created_at.desc()).first()
     return render_template(
         "tools/detail.html",
         tool=tool,
@@ -141,6 +151,8 @@ def detail(tool_id: int):
         perspective_previews=perspective_previews,
         mask_previews=mask_previews,
         contour_previews=contour_previews,
+        aligned_contour_previews=aligned_contour_previews,
+        active_contour=active_contour,
     )
 
 

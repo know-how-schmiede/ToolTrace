@@ -78,10 +78,12 @@ def test_image_upload_stores_metadata_and_placeholder_job(client, app):
         assert ProcessedImage.query.filter_by(image_type="perspective_corrected").count() == 1
         assert ProcessedImage.query.filter_by(image_type="cleaned_mask").count() == 1
         assert ProcessedImage.query.filter_by(image_type="contour_overlay").count() == 1
+        assert ProcessedImage.query.filter_by(image_type="aligned_contour_preview").count() == 1
         contour = Contour.query.one()
         assert contour.contour_type == "outer_detected"
         assert contour.is_active
         assert contour.geometry_data["type"] == "outer_contour"
+        assert contour.geometry_data["coordinate_space"] == "tool_mm"
         assert source_image.segmentation_score is not None
 
 
@@ -146,6 +148,7 @@ def test_tool_library_renders_thumbnail_and_image_route(client, app):
         perspective_image = ProcessedImage.query.filter_by(image_type="perspective_corrected").one()
         mask_image = ProcessedImage.query.filter_by(image_type="cleaned_mask").one()
         contour_image = ProcessedImage.query.filter_by(image_type="contour_overlay").one()
+        aligned_contour_image = ProcessedImage.query.filter_by(image_type="aligned_contour_preview").one()
 
     processed_response = client.get(f"/tools/{tool.id}/processed-images/{processed_image.id}")
     assert processed_response.status_code == 200
@@ -162,6 +165,10 @@ def test_tool_library_renders_thumbnail_and_image_route(client, app):
     contour_response = client.get(f"/tools/{tool.id}/processed-images/{contour_image.id}")
     assert contour_response.status_code == 200
     assert contour_response.mimetype == "image/png"
+
+    aligned_contour_response = client.get(f"/tools/{tool.id}/processed-images/{aligned_contour_image.id}")
+    assert aligned_contour_response.status_code == 200
+    assert aligned_contour_response.mimetype == "image/png"
 
 
 def test_small_image_upload_is_saved_with_warning(client, app):

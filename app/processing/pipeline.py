@@ -147,6 +147,15 @@ class ToolProcessingPipeline:
                 / "contours"
                 / f"outer_contour_overlay_job_{job.id}.png"
             )
+            aligned_contour_path = (
+                storage_root
+                / "users"
+                / str(job.user_id)
+                / "tools"
+                / str(job.tool_id)
+                / "contours"
+                / f"aligned_outer_contour_job_{job.id}.png"
+            )
             job.current_step = "extract_contours"
             job.progress_percent = 85
             db.session.commit()
@@ -156,6 +165,7 @@ class ToolProcessingPipeline:
                 mask_path=mask_path,
                 output_path=contour_overlay_path,
                 pixels_per_mm=correction.pixels_per_mm,
+                aligned_output_path=aligned_contour_path,
             )
             warnings = segmentation.warnings + contour_result.warnings
             if not contour_result.warnings:
@@ -166,6 +176,15 @@ class ToolProcessingPipeline:
                         file_path=contour_overlay_path.relative_to(storage_root).as_posix(),
                         width_px=correction.width_px,
                         height_px=correction.height_px,
+                    )
+                )
+                db.session.add(
+                    ProcessedImage(
+                        processing_job_id=job.id,
+                        image_type="aligned_contour_preview",
+                        file_path=aligned_contour_path.relative_to(storage_root).as_posix(),
+                        width_px=contour_result.width_px,
+                        height_px=contour_result.height_px,
                     )
                 )
                 Contour.query.filter_by(tool_id=job.tool_id, is_active=True).update({"is_active": False})

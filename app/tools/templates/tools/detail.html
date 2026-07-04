@@ -80,6 +80,18 @@
       {% else %}
         <p class="text-secondary">Noch keine Aussenkontur erzeugt.</p>
       {% endif %}
+      {% if aligned_contour_previews %}
+        {% set aligned_contour_preview = aligned_contour_previews[0] %}
+        <h3 class="h5 mt-3">Ausrichtung und Bounding Box</h3>
+        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=aligned_contour_preview.id) }}" alt="Ausgerichtete Aussenkontur mit Bounding Box und Koordinatenachsen">
+        {% if active_contour %}
+          <dl class="row mt-2 mb-0 text-secondary">
+            <dt class="col-sm-4">Breite</dt><dd class="col-sm-8">{{ "%.1f"|format(active_contour.width_mm) }} mm</dd>
+            <dt class="col-sm-4">Hoehe</dt><dd class="col-sm-8">{{ "%.1f"|format(active_contour.height_mm) }} mm</dd>
+            <dt class="col-sm-4">Nullpunkt</dt><dd class="col-sm-8">links unten, X nach rechts, Y nach oben</dd>
+          </dl>
+        {% endif %}
+      {% endif %}
     </section>
     <section class="mb-4">
       <h2 class="h4">Metadaten</h2>
