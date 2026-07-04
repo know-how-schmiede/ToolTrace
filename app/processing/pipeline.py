@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import ProcessedImage, ProcessingJob, SourceImage, Tool
 from app.processing.page_detection import PageDetectionService
 from app.processing.perspective import PerspectiveCorrectionService
+from app.processing.segmentation.opencv_backend import OpenCVSegmentationBackend
 
 
 class ToolProcessingPipeline:
@@ -111,12 +112,41 @@ class ToolProcessingPipeline:
                     height_px=correction.height_px,
                 )
             )
+            job.current_step = "segment_tool"
+            job.progress_percent = 65
+            db.session.commit()
+
+            mask_path = (
+                storage_root
+                / "users"
+                / str(job.user_id)
+                / "tools"
+                / str(job.tool_id)
+                / "masks"
+                / f"cleaned_mask_job_{job.id}.png"
+            )
+            segmentation = OpenCVSegmentationBackend().segment(corrected_path, mask_path)
+            job.source_image.segmentation_score = segmentation.confidence
+            db.session.add(
+                ProcessedImage(
+                    processing_job_id=job.id,
+                    image_type="cleaned_mask",
+                    file_path=mask_path.relative_to(storage_root).as_posix(),
+                    width_px=segmentation.width_px,
+                    height_px=segmentation.height_px,
+                )
+            )
+
             job.status = "completed_with_warning"
-            job.current_step = "correct_perspective"
-            job.progress_percent = 50
-            job.error_code = None
-            job.error_message = "DIN-A4-Blatt erkannt und perspektivisch entzerrt. Segmentierung ist der naechste Verarbeitungsschritt."
-            job.tool.status = "processing"
+            job.current_step = "clean_mask"
+            job.progress_percent = 75
+            job.error_code = ",".join(segmentation.warnings) if segmentation.warnings else None
+            if segmentation.warnings:
+                job.error_message = "Werkzeugmaske wurde erzeugt, enthaelt aber Warnungen."
+                job.tool.status = "warning"
+            else:
+                job.error_message = "Werkzeugmaske wurde aus dem perspektivisch entzerrten Bild erzeugt. Konturerkennung ist der naechste Verarbeitungsschritt."
+                job.tool.status = "processing"
         else:
             job.status = "failed"
             job.current_step = "detect_page"

@@ -20,12 +20,12 @@ Implementiert ist die technische Grundstruktur:
 * Speicherung von Upload-Metadaten und Dateien unter `storage/users/<user_id>/tools/<tool_id>/source/`
 * OpenCV-basierte DIN-A4-Erkennung mit markierter Vorschau unter `processed/`
 * Perspektivkorrektur erkannter DIN-A4-Blaetter mit konfigurierbarer Pixel-pro-Millimeter-Skalierung
-* Platzhalter fuer Segmentierungsbackends, Layout- und SVG-Exportservices
+* einfache OpenCV-Werkzeugsegmentierung fuer dunkle bzw. kontrastreiche Werkzeuge auf weissem DIN-A4-Blatt
+* Platzhalter fuer Konturerkennung, Layout- und SVG-Exportservices
 * automatisierte Basistests
 
 Noch nicht implementiert:
 
-* Werkzeugsegmentierung
 * Konturerkennung
 * interaktiver Kontureditor
 * echter SVG-Export aus Werkzeugkonturen

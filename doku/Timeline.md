@@ -1,5 +1,14 @@
 # ToolTrace Timeline
 
+## 0.3.0 - 2026-07-04
+
+### Geaendert
+
+* Erste OpenCV-basierte Werkzeugsegmentierung auf dem perspektivisch entzerrten DIN-A4-Bild umgesetzt.
+* Bereinigte Werkzeugmaske wird im Werkzeugordner unter `masks/` gespeichert.
+* Pipeline aktualisiert Job-Status, Segmentierungs-Score und erzeugt eine Maskenvorschau.
+* Werkzeugdetailseite zeigt die bereinigte Werkzeugmaske an.
+
 ## 0.2.3 - 2026-07-04
 
 ### Geaendert

@@ -53,6 +53,25 @@
       {% endif %}
     </section>
     <section class="mb-4">
+      <h2 class="h4">Werkzeugmaske</h2>
+      {% if mask_previews %}
+        {% set mask_preview = mask_previews[0] %}
+        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=mask_preview.id) }}" alt="Bereinigte Werkzeugmaske">
+        {% set mask_job = mask_preview.processing_job %}
+        <div class="mt-2">
+          <span class="badge text-bg-secondary">{{ mask_job.status }}</span>
+          {% if mask_job.source_image and mask_job.source_image.segmentation_score is not none %}
+            <span class="text-secondary ms-2">Score: {{ "%.2f"|format(mask_job.source_image.segmentation_score) }}</span>
+          {% endif %}
+        </div>
+        {% if mask_job.error_message %}
+          <p class="text-secondary mt-2 mb-0">{{ mask_job.error_message }}</p>
+        {% endif %}
+      {% else %}
+        <p class="text-secondary">Noch keine Werkzeugmaske erzeugt.</p>
+      {% endif %}
+    </section>
+    <section class="mb-4">
       <h2 class="h4">Metadaten</h2>
       <dl class="row">
         <dt class="col-sm-4">Einsatzzweck</dt><dd class="col-sm-8">{{ tool.purpose }}</dd>
