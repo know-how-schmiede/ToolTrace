@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from io import BytesIO
 from pathlib import Path
+import shutil
 
 from flask import current_app
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -45,6 +46,16 @@ class ToolService:
     def user_tool_or_404(self, user_id: int, tool_id: int) -> Tool:
         return Tool.query.filter_by(id=tool_id, user_id=user_id).first_or_404()
 
+    def delete_tool(self, tool: Tool) -> None:
+        user_id = tool.user_id
+        tool_id = tool.id
+        storage_service = StorageService()
+        tool_root = storage_service.tool_root(user_id, tool_id)
+        db.session.add(AuditLog(user_id=user_id, action="tool_deleted", entity_type="tool", entity_id=tool_id))
+        db.session.delete(tool)
+        db.session.commit()
+        storage_service.delete_tool_directory(tool_root)
+
 
 class StorageService:
     subfolders = ("source", "processed", "masks", "previews", "contours", "exports")
@@ -60,6 +71,14 @@ class StorageService:
 
     def relative_to_storage(self, path: Path) -> str:
         return path.relative_to(Path(current_app.config["STORAGE_PATH"])).as_posix()
+
+    def delete_tool_directory(self, tool_root: Path) -> None:
+        storage_root = Path(current_app.config["STORAGE_PATH"]).resolve()
+        resolved_tool_root = tool_root.resolve()
+        if storage_root == resolved_tool_root or storage_root not in resolved_tool_root.parents:
+            raise ValueError("Refusing to delete outside storage path.")
+        if resolved_tool_root.exists():
+            shutil.rmtree(resolved_tool_root)
 
 
 class UploadService:

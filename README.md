@@ -15,6 +15,7 @@ Implementiert ist die technische Grundstruktur:
 * Flask-Login mit Registrierung, Anmeldung und Abmeldung
 * Werkzeugbibliothek mit Suche und Statusfilter
 * Formular zum Anlegen eines Werkzeugs
+* Loeschen von Werkzeugen inklusive zugehoeriger Datenbankeintraege und Dateien
 * sicherer Bild-Upload fuer JPEG/PNG mit Pillow-Validierung
 * Speicherung von Upload-Metadaten und Dateien unter `storage/users/<user_id>/tools/<tool_id>/source/`
 * OpenCV-basierte DIN-A4-Erkennung mit markierter Vorschau unter `processed/`

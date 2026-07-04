@@ -1,5 +1,13 @@
 # ToolTrace Timeline
 
+## 0.2.1 - 2026-07-04
+
+### Geaendert
+
+* Loeschbutton fuer Werkzeuge in Bibliothek und Detailseite ergaenzt.
+* Werkzeugloeschung entfernt neben dem Datensatz auch Uploads, verarbeitete Bilder und weitere Dateien aus dem Werkzeugordner.
+* Loeschaktion prueft weiterhin den angemeldeten Besitzer des Werkzeugs.
+
 ## 0.2.0 - 2026-07-04
 
 ### Geaendert

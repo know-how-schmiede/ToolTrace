@@ -5,7 +5,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw
 
 from app.models import ProcessedImage, ProcessingJob, SourceImage, Tool, User
-from app.tools.services import ToolService
+from app.tools.services import StorageService, ToolService
 from tests.conftest import register_and_login
 
 
@@ -215,3 +215,38 @@ def test_invalid_required_photo_does_not_create_tool(client, app):
 
     with app.app_context():
         assert Tool.query.filter_by(name="Defekt").count() == 0
+
+
+def test_user_can_delete_tool_with_related_data_and_files(client, app):
+    register_and_login(client)
+    image_bytes = make_page_image_bytes()
+
+    client.post(
+        "/tools/new",
+        data={
+            "name": "Loeschtest",
+            "category_id": "0",
+            "image": (image_bytes, "loeschtest.png"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    with app.app_context():
+        tool = Tool.query.filter_by(name="Loeschtest").one()
+        tool_id = tool.id
+        tool_root = StorageService().tool_root(tool.user_id, tool.id)
+        assert tool_root.exists()
+        assert SourceImage.query.filter_by(tool_id=tool.id).count() == 1
+        assert ProcessingJob.query.filter_by(tool_id=tool.id).count() == 1
+
+    response = client.post(f"/tools/{tool_id}/delete", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert "alle zugehoerigen Dateien wurden geloescht" in response.get_data(as_text=True)
+
+    with app.app_context():
+        assert Tool.query.filter_by(id=tool_id).count() == 0
+        assert SourceImage.query.filter_by(tool_id=tool_id).count() == 0
+        assert ProcessingJob.query.filter_by(tool_id=tool_id).count() == 0
+        assert not tool_root.exists()

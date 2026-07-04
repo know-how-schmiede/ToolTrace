@@ -56,8 +56,7 @@ def update_tool(tool_id: int):
 @login_required
 def delete_tool(tool_id: int):
     tool = ToolService().user_tool_or_404(current_user.id, tool_id)
-    db.session.delete(tool)
-    db.session.commit()
+    ToolService().delete_tool(tool)
     return "", 204
 
 

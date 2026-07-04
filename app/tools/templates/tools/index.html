@@ -36,7 +36,13 @@
           </div>
           <p class="text-secondary mb-2">{{ tool.category.name if tool.category else "Keine Kategorie" }}</p>
           <p>{{ tool.purpose }}</p>
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('tools.detail', tool_id=tool.id) }}">Oeffnen</a>
+          <div class="d-flex gap-2">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('tools.detail', tool_id=tool.id) }}">Oeffnen</a>
+            <form method="post" action="{{ url_for('tools.delete', tool_id=tool.id) }}" onsubmit="return confirm('Werkzeug und alle zugehoerigen Dateien wirklich loeschen?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Loeschen</button>
+            </form>
+          </div>
         </div>
       </div>
     {% endfor %}

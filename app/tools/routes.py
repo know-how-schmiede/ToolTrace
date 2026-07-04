@@ -115,6 +115,21 @@ def detail(tool_id: int):
     return render_template("tools/detail.html", tool=tool, upload_form=upload_form, page_previews=page_previews)
 
 
+@bp.post("/<int:tool_id>/delete")
+@login_required
+def delete(tool_id: int):
+    tool = ToolService().user_tool_or_404(current_user.id, tool_id)
+    tool_name = tool.name
+    try:
+        ToolService().delete_tool(tool)
+    except ValueError as exc:
+        db.session.rollback()
+        flash(f"Werkzeug konnte nicht geloescht werden: {exc}", "danger")
+        return redirect(url_for("tools.detail", tool_id=tool_id))
+    flash(f"Werkzeug \"{tool_name}\" und alle zugehoerigen Dateien wurden geloescht.", "success")
+    return redirect(url_for("tools.index"))
+
+
 @bp.get("/<int:tool_id>/images/<int:image_id>")
 @login_required
 def source_image(tool_id: int, image_id: int):

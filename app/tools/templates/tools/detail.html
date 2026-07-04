@@ -6,7 +6,13 @@
     <h1>{{ tool.name }}</h1>
     <p class="text-secondary mb-0">{{ tool.category.name if tool.category else "Keine Kategorie" }} · {{ tool.status }}</p>
   </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('tools.index') }}">Zur Bibliothek</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('tools.index') }}">Zur Bibliothek</a>
+    <form method="post" action="{{ url_for('tools.delete', tool_id=tool.id) }}" onsubmit="return confirm('Werkzeug und alle zugehoerigen Daten und Dateien wirklich loeschen?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline-danger" type="submit">Werkzeug loeschen</button>
+    </form>
+  </div>
 </div>
 <div class="row g-4">
   <div class="col-lg-7">
