@@ -133,6 +133,12 @@ Die Tests decken aktuell App-Erzeugung, Registrierung/Login, Werkzeuganlage, Upl
 
 Die Einsteigerbeschreibung [Vom Bild zur SVG](doku/Bild_zu_SVG_Workflow.md) erklaert den Workflow vom Werkzeugfoto bis zur vorbereiteten SVG-Kontur. Sie beschreibt die Bildanforderungen, die automatische Verarbeitung, die wichtigsten OpenCV-Schritte und die verwendeten Parameter.
 
+Die Anleitung [Fotos fuer die Konturerkennung aufnehmen](doku/Fotoaufnahme_fuer_Konturerkennung.md) beschreibt zwei Aufnahmewege: schnelle Fotos mit minimalem Aufwand und ein genaueres Setup mit Stativ, diffuser Beleuchtung und optionalem Leuchttisch fuer bestmoegliche Konturqualitaet.
+
+## Lizenz
+
+ToolTrace verwendet dieselbe Lizenzstruktur wie NeoFab. Die nicht-kommerzielle Nutzung steht unter der Creative-Commons-Lizenz [Attribution-NonCommercial-ShareAlike 4.0 International](LICENCE.txt). Kommerzielle Nutzung ist nur nach vorheriger schriftlicher Genehmigung erlaubt; Details stehen in [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md).
+
 ## Projektstruktur
 
 ```text
