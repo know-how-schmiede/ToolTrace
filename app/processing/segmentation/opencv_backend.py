@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from app.processing.mask_cleanup import MaskCleanupService
 
@@ -17,13 +18,21 @@ class OpenCVSegmentationBackend(SegmentationBackend):
 
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
 
-        dark_mask = cv2.inRange(gray, 0, 215)
-        saturation_mask = cv2.inRange(hsv[:, :, 1], 35, 255)
-        mask = cv2.bitwise_or(dark_mask, saturation_mask)
+        height, width = gray.shape[:2]
+        background = self._estimate_background_lab(lab)
+        color_distance = ((lab.astype("float32") - background.astype("float32")) ** 2).sum(axis=2) ** 0.5
+        background_gray = float(background[0])
 
-        height, width = mask.shape[:2]
-        border = max(4, int(min(width, height) * 0.01))
+        dark_limit = min(195, max(150, int(background_gray - 28)))
+        dark_mask = cv2.inRange(gray, 0, dark_limit)
+        very_dark_mask = cv2.inRange(gray, 0, 155)
+        color_mask = ((color_distance > 34) & (gray < 232)).astype("uint8") * 255
+        saturation_mask = ((hsv[:, :, 1] > 60) & (gray < 238)).astype("uint8") * 255
+        mask = cv2.bitwise_or(cv2.bitwise_or(dark_mask, very_dark_mask), cv2.bitwise_or(color_mask, saturation_mask))
+
+        border = max(8, int(min(width, height) * 0.04))
         mask[:border, :] = 0
         mask[-border:, :] = 0
         mask[:, :border] = 0
@@ -51,3 +60,14 @@ class OpenCVSegmentationBackend(SegmentationBackend):
             height_px=height,
             foreground_area_px=foreground_area,
         )
+
+    def _estimate_background_lab(self, lab_image) -> np.ndarray:
+        height, width = lab_image.shape[:2]
+        margin = max(10, int(min(width, height) * 0.08))
+        samples = [
+            lab_image[margin : height - margin, margin : margin * 2].reshape(-1, 3),
+            lab_image[margin : height - margin, width - margin * 2 : width - margin].reshape(-1, 3),
+            lab_image[margin : margin * 2, margin : width - margin].reshape(-1, 3),
+            lab_image[height - margin * 2 : height - margin, margin : width - margin].reshape(-1, 3),
+        ]
+        return np.median(np.concatenate(samples), axis=0)

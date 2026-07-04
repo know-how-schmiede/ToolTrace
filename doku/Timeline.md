@@ -1,5 +1,13 @@
 # ToolTrace Timeline
 
+## 0.3.1 - 2026-07-04
+
+### Geaendert
+
+* OpenCV-Segmentierung fuer realistische Schraubendreherfotos nachjustiert.
+* Hintergrund wird robuster aus dem A4-Blatt geschaetzt, statt mit einem festen Helligkeitswert zu arbeiten.
+* Maskenbereinigung erhaelt duenne Werkzeugbereiche besser und filtert Randartefakte staerker aus.
+
 ## 0.3.0 - 2026-07-04
 
 ### Geaendert
