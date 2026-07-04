@@ -74,6 +74,9 @@ class PageDetectionService:
 
         if result.found and result.corners:
             points = np.array(result.corners, dtype=np.int32)
+            overlay = image.copy()
+            cv2.fillPoly(overlay, [points], (0, 180, 0))
+            image = cv2.addWeighted(overlay, 0.30, image, 0.70, 0)
             cv2.polylines(image, [points], True, (0, 180, 0), 6)
             for index, point in enumerate(points, start=1):
                 point_tuple = (int(point[0]), int(point[1]))

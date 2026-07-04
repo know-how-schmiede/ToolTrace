@@ -1,5 +1,11 @@
 # ToolTrace Timeline
 
+## 0.2.2 - 2026-07-04
+
+### Geaendert
+
+* Erkannte DIN-A4-Fläche in der Verarbeitungsvorschau mit transparenter gruener Flaechenmarkierung hervorgehoben; Deckkraft auf 30 Prozent gesetzt.
+
 ## 0.2.1 - 2026-07-04
 
 ### Geaendert
