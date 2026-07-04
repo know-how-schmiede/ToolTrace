@@ -2,18 +2,27 @@ from __future__ import annotations
 
 from io import BytesIO
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
-from app.models import ProcessingJob, SourceImage, Tool, User
+from app.models import ProcessedImage, ProcessingJob, SourceImage, Tool, User
 from app.tools.services import ToolService
 from tests.conftest import register_and_login
 
 
+def make_page_image_bytes(size: tuple[int, int] = (800, 600)) -> BytesIO:
+    image = Image.new("RGB", size, "#8c8c8c")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((230, 60, 570, 540), fill="white", outline="black", width=4)
+    draw.rectangle((350, 250, 450, 360), fill="#222222")
+    image_bytes = BytesIO()
+    image.save(image_bytes, format="PNG")
+    image_bytes.seek(0)
+    return image_bytes
+
+
 def test_user_can_create_tool(client, app):
     register_and_login(client)
-    image_bytes = BytesIO()
-    Image.new("RGB", (20, 20), "white").save(image_bytes, format="PNG")
-    image_bytes.seek(0)
+    image_bytes = make_page_image_bytes()
 
     response = client.post(
         "/tools/new",
@@ -45,9 +54,7 @@ def test_image_upload_stores_metadata_and_placeholder_job(client, app):
         tool = ToolService().create_tool(user.id, {"name": "Hammer", "purpose": "Shadowboard"})
         tool_id = tool.id
 
-    image_bytes = BytesIO()
-    Image.new("RGB", (20, 20), "white").save(image_bytes, format="PNG")
-    image_bytes.seek(0)
+    image_bytes = make_page_image_bytes()
 
     response = client.post(
         f"/tools/{tool_id}",
@@ -63,17 +70,16 @@ def test_image_upload_stores_metadata_and_placeholder_job(client, app):
         source_image = SourceImage.query.one()
         job = ProcessingJob.query.one()
         assert source_image.original_filename == "hammer.png"
-        assert source_image.width_px == 20
+        assert source_image.width_px == 800
         assert source_image.mime_type == "image/png"
-        assert job.status == "queued"
-        assert job.current_step == "validate_image"
+        assert job.status == "completed_with_warning"
+        assert job.current_step == "detect_page"
+        assert source_image.page_detection_score is not None
 
 
 def test_user_can_create_tool_with_initial_image_upload(client, app):
     register_and_login(client)
-    image_bytes = BytesIO()
-    Image.new("RGB", (20, 20), "white").save(image_bytes, format="PNG")
-    image_bytes.seek(0)
+    image_bytes = make_page_image_bytes()
 
     response = client.post(
         "/tools/new",
@@ -95,14 +101,12 @@ def test_user_can_create_tool_with_initial_image_upload(client, app):
         source_image = SourceImage.query.filter_by(tool_id=tool.id).one()
         job = ProcessingJob.query.filter_by(tool_id=tool.id).one()
         assert source_image.original_filename == "schraubendreher.png"
-        assert job.status == "queued"
+        assert job.status == "completed_with_warning"
 
 
 def test_tool_library_renders_thumbnail_and_image_route(client, app):
     register_and_login(client)
-    image_bytes = BytesIO()
-    Image.new("RGB", (20, 20), "white").save(image_bytes, format="PNG")
-    image_bytes.seek(0)
+    image_bytes = make_page_image_bytes()
 
     client.post(
         "/tools/new",
@@ -127,6 +131,13 @@ def test_tool_library_renders_thumbnail_and_image_route(client, app):
     image_response = client.get(image_url)
     assert image_response.status_code == 200
     assert image_response.mimetype == "image/png"
+
+    with app.app_context():
+        processed_image = ProcessedImage.query.filter_by(image_type="page_detected").one()
+
+    processed_response = client.get(f"/tools/{tool.id}/processed-images/{processed_image.id}")
+    assert processed_response.status_code == 200
+    assert processed_response.mimetype == "image/png"
 
 
 def test_small_image_upload_is_saved_with_warning(client, app):
@@ -161,9 +172,7 @@ def test_small_image_upload_is_saved_with_warning(client, app):
 
 def test_photo_is_the_only_required_field_for_new_tool(client, app):
     register_and_login(client)
-    image_bytes = BytesIO()
-    Image.new("RGB", (20, 20), "white").save(image_bytes, format="PNG")
-    image_bytes.seek(0)
+    image_bytes = make_page_image_bytes()
 
     response = client.post(
         "/tools/new",

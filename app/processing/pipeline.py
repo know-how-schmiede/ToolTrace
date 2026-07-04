@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from pathlib import Path
+
+from flask import current_app
+
 from app.extensions import db
-from app.models import ProcessingJob, SourceImage, Tool
+from app.models import ProcessedImage, ProcessingJob, SourceImage, Tool
+from app.processing.page_detection import PageDetectionService
 
 
 class ToolProcessingPipeline:
@@ -33,4 +39,69 @@ class ToolProcessingPipeline:
         return job
 
     def run(self, processing_job_id: int) -> None:
-        raise NotImplementedError("Die OpenCV-Verarbeitung wird im naechsten Entwicklungsschritt implementiert.")
+        job = db.session.get(ProcessingJob, processing_job_id)
+        if job is None:
+            raise ValueError("processing_job_not_found")
+        if job.source_image is None:
+            raise ValueError("source_image_not_found")
+
+        job.status = "running"
+        job.current_step = "detect_page"
+        job.progress_percent = 20
+        job.started_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        storage_root = Path(current_app.config["STORAGE_PATH"]).resolve()
+        source_path = (storage_root / job.source_image.original_path).resolve()
+        if storage_root not in source_path.parents or not source_path.is_file():
+            self._mark_failed(job, "source_image_missing", "Das Quellbild wurde nicht gefunden.")
+            return
+
+        preview_path = (
+            storage_root
+            / "users"
+            / str(job.user_id)
+            / "tools"
+            / str(job.tool_id)
+            / "processed"
+            / f"page_detected_job_{job.id}.png"
+        )
+
+        detector = PageDetectionService()
+        result = detector.detect(source_path)
+        preview_width, preview_height = detector.write_preview(source_path, result, preview_path)
+
+        job.source_image.page_detection_score = result.score
+        processed_image = ProcessedImage(
+            processing_job_id=job.id,
+            image_type="page_detected",
+            file_path=preview_path.relative_to(storage_root).as_posix(),
+            width_px=preview_width,
+            height_px=preview_height,
+        )
+        db.session.add(processed_image)
+
+        if result.found:
+            job.status = "completed_with_warning"
+            job.current_step = "detect_page"
+            job.progress_percent = 35
+            job.error_code = None
+            job.error_message = "DIN-A4-Blatt erkannt. Perspektivkorrektur ist der naechste Verarbeitungsschritt."
+            job.tool.status = "processing"
+        else:
+            job.status = "failed"
+            job.current_step = "detect_page"
+            job.progress_percent = 20
+            job.error_code = ",".join(result.warnings) or "page_not_found"
+            job.error_message = "DIN-A4-Blatt konnte nicht sicher erkannt werden."
+            job.tool.status = "warning"
+        job.finished_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+    def _mark_failed(self, job: ProcessingJob, code: str, message: str) -> None:
+        job.status = "failed"
+        job.error_code = code
+        job.error_message = message
+        job.finished_at = datetime.now(timezone.utc)
+        job.tool.status = "error"
+        db.session.commit()

@@ -1,5 +1,16 @@
 # ToolTrace Timeline
 
+## 0.2.0 - 2026-07-04
+
+### Geaendert
+
+* Erste OpenCV-basierte DIN-A4-Erkennung fuer hochgeladene Werkzeugbilder umgesetzt.
+* Verarbeitungspipeline fuehrt die Blatterkennung nach dem Upload synchron aus.
+* Vorschau mit markierter Blattkontur und Eckpunkten wird unter `processed/` gespeichert.
+* Werkzeugdetailseite zeigt den aktuellen Status und Score der DIN-A4-Erkennung an.
+* Geschuetzte Route fuer verarbeitete Vorschaubilder ergaenzt.
+* OpenCV und NumPy als Bildverarbeitungsabhaengigkeiten aufgenommen.
+
 ## 0.1.1 - 2026-07-04
 
 ### Geaendert

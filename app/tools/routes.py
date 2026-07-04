@@ -6,7 +6,7 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import SourceImage, Tool, ToolCategory
+from app.models import ProcessedImage, SourceImage, Tool, ToolCategory
 from app.processing.pipeline import ToolProcessingPipeline
 
 from .forms import ToolForm, UploadImageForm
@@ -71,7 +71,8 @@ def new():
         )
         try:
             image = UploadService().save_source_image(tool=tool, upload=upload)
-            ToolProcessingPipeline().enqueue_placeholder(tool=tool, source_image=image, user_id=current_user.id)
+            job = ToolProcessingPipeline().enqueue_placeholder(tool=tool, source_image=image, user_id=current_user.id)
+            ToolProcessingPipeline().run(job.id)
         except ValueError as exc:
             db.session.rollback()
             db.session.delete(tool)
@@ -94,7 +95,8 @@ def detail(tool_id: int):
     if upload_form.validate_on_submit():
         try:
             image = UploadService().save_source_image(tool=tool, upload=upload_form.image.data)
-            ToolProcessingPipeline().enqueue_placeholder(tool=tool, source_image=image, user_id=current_user.id)
+            job = ToolProcessingPipeline().enqueue_placeholder(tool=tool, source_image=image, user_id=current_user.id)
+            ToolProcessingPipeline().run(job.id)
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), "danger")
@@ -104,7 +106,13 @@ def detail(tool_id: int):
                 flash(warning, "warning")
             flash("Bild wurde hochgeladen. Die Verarbeitung ist als Platzhalterauftrag angelegt.", "success")
             return redirect(url_for("tools.detail", tool_id=tool.id))
-    return render_template("tools/detail.html", tool=tool, upload_form=upload_form)
+    page_previews = (
+        ProcessedImage.query.join(ProcessedImage.processing_job)
+        .filter(ProcessedImage.image_type == "page_detected", ProcessedImage.processing_job.has(tool_id=tool.id))
+        .order_by(ProcessedImage.created_at.desc())
+        .all()
+    )
+    return render_template("tools/detail.html", tool=tool, upload_form=upload_form, page_previews=page_previews)
 
 
 @bp.get("/<int:tool_id>/images/<int:image_id>")
@@ -119,3 +127,21 @@ def source_image(tool_id: int, image_id: int):
     if not image_path.is_file():
         abort(404)
     return send_file(image_path, mimetype=image.mime_type, max_age=3600)
+
+
+@bp.get("/<int:tool_id>/processed-images/<int:processed_image_id>")
+@login_required
+def processed_image(tool_id: int, processed_image_id: int):
+    tool = ToolService().user_tool_or_404(current_user.id, tool_id)
+    image = (
+        ProcessedImage.query.join(ProcessedImage.processing_job)
+        .filter(ProcessedImage.id == processed_image_id, ProcessedImage.processing_job.has(tool_id=tool.id))
+        .first_or_404()
+    )
+    storage_root = Path(current_app.config["STORAGE_PATH"]).resolve()
+    image_path = (storage_root / image.file_path).resolve()
+    if storage_root not in image_path.parents:
+        abort(404)
+    if not image_path.is_file():
+        abort(404)
+    return send_file(image_path, mimetype="image/png", max_age=3600)

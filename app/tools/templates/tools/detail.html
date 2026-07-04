@@ -18,6 +18,25 @@
       </section>
     {% endif %}
     <section class="mb-4">
+      <h2 class="h4">DIN-A4-Erkennung</h2>
+      {% if page_previews %}
+        {% set page_preview = page_previews[0] %}
+        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=page_preview.id) }}" alt="Vorschau der DIN-A4-Erkennung">
+        {% set latest_job = page_preview.processing_job %}
+        <div class="mt-2">
+          <span class="badge text-bg-secondary">{{ latest_job.status }}</span>
+          {% if latest_job.source_image and latest_job.source_image.page_detection_score is not none %}
+            <span class="text-secondary ms-2">Score: {{ "%.2f"|format(latest_job.source_image.page_detection_score) }}</span>
+          {% endif %}
+        </div>
+        {% if latest_job.error_message %}
+          <p class="text-secondary mt-2 mb-0">{{ latest_job.error_message }}</p>
+        {% endif %}
+      {% else %}
+        <p class="text-secondary">Noch keine Blatterkennung ausgefuehrt.</p>
+      {% endif %}
+    </section>
+    <section class="mb-4">
       <h2 class="h4">Metadaten</h2>
       <dl class="row">
         <dt class="col-sm-4">Einsatzzweck</dt><dd class="col-sm-8">{{ tool.purpose }}</dd>

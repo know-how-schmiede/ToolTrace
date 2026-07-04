@@ -17,12 +17,12 @@ Implementiert ist die technische Grundstruktur:
 * Formular zum Anlegen eines Werkzeugs
 * sicherer Bild-Upload fuer JPEG/PNG mit Pillow-Validierung
 * Speicherung von Upload-Metadaten und Dateien unter `storage/users/<user_id>/tools/<tool_id>/source/`
-* Platzhalter fuer Processing-Pipeline, Segmentierungsbackends, Layout- und SVG-Exportservices
+* OpenCV-basierte DIN-A4-Erkennung mit markierter Vorschau unter `processed/`
+* Platzhalter fuer Perspektivkorrektur, Segmentierungsbackends, Layout- und SVG-Exportservices
 * automatisierte Basistests
 
 Noch nicht implementiert:
 
-* DIN-A4-Erkennung
 * Perspektivkorrektur
 * Werkzeugsegmentierung
 * Konturerkennung
