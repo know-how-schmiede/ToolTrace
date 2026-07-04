@@ -78,3 +78,22 @@ def test_opencv_segmentation_suppresses_soft_shadow_next_to_tool(tmp_path: Path)
     assert mask[260, 220] == 255
     assert mask[438, 260] == 255
     assert mask[410, 330] == 0
+
+
+def test_opencv_segmentation_removes_page_edge_artifacts(tmp_path: Path):
+    image_path = tmp_path / "edge-artifact.png"
+    mask_path = tmp_path / "edge-artifact-mask.png"
+    image = Image.new("RGB", (420, 594), (218, 216, 210))
+    draw = ImageDraw.Draw(image)
+
+    draw.polygon([(22, 48), (60, 548), (82, 548), (42, 48)], fill=(54, 54, 50))
+    draw.line((170, 130, 245, 330), fill=(86, 86, 82), width=7)
+    draw.ellipse((220, 320, 305, 505), fill=(30, 29, 27))
+    image.save(image_path)
+
+    result = OpenCVSegmentationBackend().segment(image_path, mask_path)
+    mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+
+    assert result.foreground_area_px > 0
+    assert mask[300, 50] == 0
+    assert mask[420, 260] == 255

@@ -1,5 +1,21 @@
 # ToolTrace Timeline
 
+## 0.4.0 - 2026-07-04
+
+### Geaendert
+
+* Konturerkennung fuer die aeussere Werkzeugkontur umgesetzt.
+* Erkannte Aussenkontur wird als rot gefuellte Flaeche mit 30% Transparenz im Werkzeugbild angezeigt.
+* Innere Artefakte innerhalb der Aussenkontur werden bei der Konturvorschau ignoriert.
+* Verarbeitungspipeline speichert das Kontur-Overlay und einen aktiven Konturdatensatz.
+
+## 0.3.3 - 2026-07-04
+
+### Geaendert
+
+* Randartefakte am DIN-A4-Blatt werden vor der Konturermittlung aus der Werkzeugmaske entfernt.
+* Regressionstest fuer schmale Artefakte am Blattrand ergaenzt.
+
 ## 0.3.2 - 2026-07-04
 
 ### Geaendert

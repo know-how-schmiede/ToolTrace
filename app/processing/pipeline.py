@@ -6,7 +6,8 @@ from pathlib import Path
 from flask import current_app
 
 from app.extensions import db
-from app.models import ProcessedImage, ProcessingJob, SourceImage, Tool
+from app.models import Contour, ProcessedImage, ProcessingJob, SourceImage, Tool
+from app.processing.contour_extraction import ContourExtractionService
 from app.processing.page_detection import PageDetectionService
 from app.processing.perspective import PerspectiveCorrectionService
 from app.processing.segmentation.opencv_backend import OpenCVSegmentationBackend
@@ -137,16 +138,62 @@ class ToolProcessingPipeline:
                 )
             )
 
-            job.status = "completed_with_warning"
-            job.current_step = "clean_mask"
-            job.progress_percent = 75
-            job.error_code = ",".join(segmentation.warnings) if segmentation.warnings else None
-            if segmentation.warnings:
-                job.error_message = "Werkzeugmaske wurde erzeugt, enthaelt aber Warnungen."
+            contour_overlay_path = (
+                storage_root
+                / "users"
+                / str(job.user_id)
+                / "tools"
+                / str(job.tool_id)
+                / "contours"
+                / f"outer_contour_overlay_job_{job.id}.png"
+            )
+            job.current_step = "extract_contours"
+            job.progress_percent = 85
+            db.session.commit()
+
+            contour_result = ContourExtractionService().extract_outer_contour_overlay(
+                image_path=corrected_path,
+                mask_path=mask_path,
+                output_path=contour_overlay_path,
+                pixels_per_mm=correction.pixels_per_mm,
+            )
+            warnings = segmentation.warnings + contour_result.warnings
+            if not contour_result.warnings:
+                db.session.add(
+                    ProcessedImage(
+                        processing_job_id=job.id,
+                        image_type="contour_overlay",
+                        file_path=contour_overlay_path.relative_to(storage_root).as_posix(),
+                        width_px=correction.width_px,
+                        height_px=correction.height_px,
+                    )
+                )
+                Contour.query.filter_by(tool_id=job.tool_id, is_active=True).update({"is_active": False})
+                db.session.add(
+                    Contour(
+                        tool_id=job.tool_id,
+                        processing_job_id=job.id,
+                        contour_type="outer_detected",
+                        geometry_data=contour_result.geometry_data,
+                        width_mm=contour_result.width_mm,
+                        height_mm=contour_result.height_mm,
+                        area_mm2=contour_result.area_mm2,
+                        perimeter_mm=contour_result.perimeter_mm,
+                        is_active=True,
+                    )
+                )
+
+            job.current_step = "completed" if not warnings else "extract_contours"
+            job.progress_percent = 100 if not warnings else 85
+            job.error_code = ",".join(warnings) if warnings else None
+            if warnings:
+                job.status = "completed_with_warning"
+                job.error_message = "Werkzeugmaske und Kontur wurden erzeugt, enthalten aber Warnungen."
                 job.tool.status = "warning"
             else:
-                job.error_message = "Werkzeugmaske wurde aus dem perspektivisch entzerrten Bild erzeugt. Konturerkennung ist der naechste Verarbeitungsschritt."
-                job.tool.status = "processing"
+                job.status = "completed"
+                job.error_message = "Aussenkontur wurde erkannt und als rote Overlay-Vorschau erzeugt."
+                job.tool.status = "ready"
         else:
             job.status = "failed"
             job.current_step = "detect_page"

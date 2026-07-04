@@ -54,6 +54,7 @@ class OpenCVSegmentationBackend(SegmentationBackend):
         mask[-border:, :] = 0
         mask[:, :border] = 0
         mask[:, -border:] = 0
+        mask = self._remove_page_edge_artifacts(mask)
 
         cleaned, foreground_area = MaskCleanupService().clean(mask)
         image_area = width * height
@@ -117,3 +118,34 @@ class OpenCVSegmentationBackend(SegmentationBackend):
             & (normalized_gray_image < normalized_background_gray + 18)
             & (edge_support > 0)
         ).astype("uint8") * 255
+
+    def _remove_page_edge_artifacts(self, mask: np.ndarray) -> np.ndarray:
+        filtered = np.where(mask > 0, 255, 0).astype("uint8")
+        height, width = filtered.shape[:2]
+        edge_margin = max(12, int(min(width, height) * 0.07))
+        inner_margin = edge_margin * 2
+
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(filtered, connectivity=8)
+        for label in range(1, num_labels):
+            x, y, component_width, component_height, area = stats[label]
+            touches_page_edge = (
+                x <= edge_margin
+                or y <= edge_margin
+                or x + component_width >= width - edge_margin
+                or y + component_height >= height - edge_margin
+            )
+            if not touches_page_edge:
+                continue
+
+            reaches_inner_page = (
+                x < width - inner_margin
+                and x + component_width > inner_margin
+                and y < height - inner_margin
+                and y + component_height > inner_margin
+            )
+            fill_ratio = area / max(component_width * component_height, 1)
+            elongated = max(component_width, component_height) / max(min(component_width, component_height), 1) > 5
+            if not reaches_inner_page or (elongated and fill_ratio < 0.55):
+                filtered[labels == label] = 0
+
+        return filtered

@@ -72,6 +72,16 @@
       {% endif %}
     </section>
     <section class="mb-4">
+      <h2 class="h4">Aussenkontur</h2>
+      {% if contour_previews %}
+        {% set contour_preview = contour_previews[0] %}
+        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=contour_preview.id) }}" alt="Aussenkontur als rote Flaeche im Werkzeugbild">
+        <p class="text-secondary mt-2 mb-0">Rote Flaeche: erkannte Aussenkontur mit 30% Transparenz.</p>
+      {% else %}
+        <p class="text-secondary">Noch keine Aussenkontur erzeugt.</p>
+      {% endif %}
+    </section>
+    <section class="mb-4">
       <h2 class="h4">Metadaten</h2>
       <dl class="row">
         <dt class="col-sm-4">Einsatzzweck</dt><dd class="col-sm-8">{{ tool.purpose }}</dd>

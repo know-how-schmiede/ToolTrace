@@ -4,7 +4,7 @@ from io import BytesIO
 
 from PIL import Image, ImageDraw
 
-from app.models import ProcessedImage, ProcessingJob, SourceImage, Tool, User
+from app.models import Contour, ProcessedImage, ProcessingJob, SourceImage, Tool, User
 from app.tools.services import StorageService, ToolService
 from tests.conftest import register_and_login
 
@@ -43,7 +43,7 @@ def test_user_can_create_tool(client, app):
 
     with app.app_context():
         tool = Tool.query.filter_by(name="Kombizange").one()
-        assert tool.status == "processing"
+        assert tool.status == "ready"
         assert tool.purpose == "Schaumstoffeinlage"
 
 
@@ -72,11 +72,16 @@ def test_image_upload_stores_metadata_and_placeholder_job(client, app):
         assert source_image.original_filename == "hammer.png"
         assert source_image.width_px == 800
         assert source_image.mime_type == "image/png"
-        assert job.status == "completed_with_warning"
-        assert job.current_step == "clean_mask"
+        assert job.status == "completed"
+        assert job.current_step == "completed"
         assert source_image.page_detection_score is not None
         assert ProcessedImage.query.filter_by(image_type="perspective_corrected").count() == 1
         assert ProcessedImage.query.filter_by(image_type="cleaned_mask").count() == 1
+        assert ProcessedImage.query.filter_by(image_type="contour_overlay").count() == 1
+        contour = Contour.query.one()
+        assert contour.contour_type == "outer_detected"
+        assert contour.is_active
+        assert contour.geometry_data["type"] == "outer_contour"
         assert source_image.segmentation_score is not None
 
 
@@ -104,8 +109,8 @@ def test_user_can_create_tool_with_initial_image_upload(client, app):
         source_image = SourceImage.query.filter_by(tool_id=tool.id).one()
         job = ProcessingJob.query.filter_by(tool_id=tool.id).one()
         assert source_image.original_filename == "schraubendreher.png"
-        assert job.status == "completed_with_warning"
-        assert job.current_step == "clean_mask"
+        assert job.status == "completed"
+        assert job.current_step == "completed"
 
 
 def test_tool_library_renders_thumbnail_and_image_route(client, app):
@@ -140,6 +145,7 @@ def test_tool_library_renders_thumbnail_and_image_route(client, app):
         processed_image = ProcessedImage.query.filter_by(image_type="page_detected").one()
         perspective_image = ProcessedImage.query.filter_by(image_type="perspective_corrected").one()
         mask_image = ProcessedImage.query.filter_by(image_type="cleaned_mask").one()
+        contour_image = ProcessedImage.query.filter_by(image_type="contour_overlay").one()
 
     processed_response = client.get(f"/tools/{tool.id}/processed-images/{processed_image.id}")
     assert processed_response.status_code == 200
@@ -152,6 +158,10 @@ def test_tool_library_renders_thumbnail_and_image_route(client, app):
     mask_response = client.get(f"/tools/{tool.id}/processed-images/{mask_image.id}")
     assert mask_response.status_code == 200
     assert mask_response.mimetype == "image/png"
+
+    contour_response = client.get(f"/tools/{tool.id}/processed-images/{contour_image.id}")
+    assert contour_response.status_code == 200
+    assert contour_response.mimetype == "image/png"
 
 
 def test_small_image_upload_is_saved_with_warning(client, app):
