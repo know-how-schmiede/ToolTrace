@@ -85,8 +85,6 @@ class UploadService:
             raise ValueError("Nur JPEG- und PNG-Dateien sind erlaubt.")
 
         width, height = image.size
-        if width < current_app.config["MIN_IMAGE_WIDTH"] or height < current_app.config["MIN_IMAGE_HEIGHT"]:
-            raise ValueError("Das Bild ist kleiner als die konfigurierte Mindestaufloesung.")
 
         root = StorageService().ensure_tool_directories(tool.user_id, tool.id)
         stored_name = f"{uuid.uuid4().hex}{self.extension_by_format[image_format]}"
@@ -108,3 +106,14 @@ class UploadService:
         db.session.add(AuditLog(user_id=tool.user_id, action="image_uploaded", entity_type="tool", entity_id=tool.id))
         db.session.commit()
         return source_image
+
+
+def image_resolution_warning(source_image: SourceImage) -> str | None:
+    min_width = current_app.config["MIN_IMAGE_WIDTH"]
+    min_height = current_app.config["MIN_IMAGE_HEIGHT"]
+    if source_image.width_px >= min_width and source_image.height_px >= min_height:
+        return None
+    return (
+        "Das Bild wurde gespeichert, ist aber kleiner als die empfohlene Mindestaufloesung "
+        f"von {min_width} x {min_height} px."
+    )

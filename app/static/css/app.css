@@ -35,6 +35,19 @@ body {
   max-width: 860px;
 }
 
+.required-label::after {
+  content: " *";
+  color: #dc3545;
+  font-weight: 700;
+}
+
+.optional-label::after {
+  content: " optional";
+  color: #667085;
+  font-size: .85em;
+  font-weight: 400;
+}
+
 .metric,
 .tool-card,
 .upload-panel,
@@ -43,6 +56,46 @@ body {
   border: 1px solid #dbe3ea;
   border-radius: 8px;
   padding: 1rem;
+}
+
+.tool-thumb-link {
+  display: block;
+  margin: -1rem -1rem 1rem;
+}
+
+.tool-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: block;
+  object-fit: cover;
+  border-radius: 8px 8px 0 0;
+  background: #eef2f6;
+}
+
+.tool-thumb-empty {
+  display: grid;
+  place-items: center;
+  color: #667085;
+  font-weight: 600;
+}
+
+.detail-thumb {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  padding: .5rem;
+}
+
+.table-thumb {
+  width: 72px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #dbe3ea;
+  background: #eef2f6;
 }
 
 .metric span {

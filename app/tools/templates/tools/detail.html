@@ -10,6 +10,13 @@
 </div>
 <div class="row g-4">
   <div class="col-lg-7">
+    {% if tool.source_images %}
+      {% set hero_image = tool.source_images[0] %}
+      <section class="mb-4">
+        <h2 class="h4">Vorschau</h2>
+        <img class="detail-thumb" src="{{ url_for('tools.source_image', tool_id=tool.id, image_id=hero_image.id) }}" alt="Werkzeugfoto {{ tool.name }}">
+      </section>
+    {% endif %}
     <section class="mb-4">
       <h2 class="h4">Metadaten</h2>
       <dl class="row">
@@ -24,10 +31,13 @@
       {% if tool.source_images %}
         <div class="table-responsive">
           <table class="table align-middle">
-            <thead><tr><th>Datei</th><th>Groesse</th><th>Format</th><th>Upload</th></tr></thead>
+            <thead><tr><th>Bild</th><th>Datei</th><th>Groesse</th><th>Format</th><th>Upload</th></tr></thead>
             <tbody>
               {% for image in tool.source_images %}
                 <tr>
+                  <td>
+                    <img class="table-thumb" src="{{ url_for('tools.source_image', tool_id=tool.id, image_id=image.id) }}" alt="Thumbnail {{ image.original_filename }}">
+                  </td>
                   <td>{{ image.original_filename }}</td>
                   <td>{{ image.width_px }} x {{ image.height_px }} px</td>
                   <td>{{ image.mime_type }}</td>
@@ -51,6 +61,7 @@
         {{ upload_form.image.label(class="form-label") }}
         {{ upload_form.image(class="form-control") }}
         {% for error in upload_form.image.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        <div class="form-text">JPEG oder PNG. Empfohlen sind mindestens 1200 x 1200 px; kleinere Bilder werden gespeichert und spaeter bewertet.</div>
         <button class="btn btn-primary mt-3" type="submit">Hochladen</button>
       </form>
     </div>

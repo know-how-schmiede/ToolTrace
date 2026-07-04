@@ -22,6 +22,14 @@
     {% for tool in tools %}
       <div class="col-md-6 col-xl-4">
         <div class="tool-card">
+          {% set thumbnail = tool.source_images[0] if tool.source_images else none %}
+          <a class="tool-thumb-link" href="{{ url_for('tools.detail', tool_id=tool.id) }}" aria-label="{{ tool.name }} oeffnen">
+            {% if thumbnail %}
+              <img class="tool-thumb" src="{{ url_for('tools.source_image', tool_id=tool.id, image_id=thumbnail.id) }}" alt="Werkzeugfoto {{ tool.name }}">
+            {% else %}
+              <div class="tool-thumb tool-thumb-empty">Kein Bild</div>
+            {% endif %}
+          </a>
           <div class="d-flex justify-content-between gap-2">
             <h2 class="h5">{{ tool.name }}</h2>
             <span class="badge text-bg-secondary align-self-start">{{ tool.status }}</span>
