@@ -1,5 +1,13 @@
 # ToolTrace Timeline
 
+## 0.3.2 - 2026-07-04
+
+### Geaendert
+
+* OpenCV-Segmentierung reduziert den Einfluss weicher Schatten um Werkzeuge.
+* Dunkle Werkzeugbereiche werden nach Beleuchtungskorrektur ueber lokale Kantenunterstuetzung wieder aufgenommen.
+* Regressionstest fuer Schraubendreher mit seitlichem Schatten ergaenzt.
+
 ## 0.3.1 - 2026-07-04
 
 ### Geaendert
