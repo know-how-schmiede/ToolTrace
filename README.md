@@ -2,9 +2,9 @@
 
 ToolTrace ist eine webbasierte Flask-Anwendung zur Erfassung, Verwaltung und automatischen Verarbeitung von Werkzeugkonturen.
 
-Ein Benutzer legt ein Werkzeug an, laedt ein Foto eines einzelnen Werkzeugs auf einem vollstaendig sichtbaren DIN-A4-Blatt hoch und verwaltet den Datensatz in seiner persoenlichen Werkzeugbibliothek. ToolTrace erkennt das DIN-A4-Blatt, korrigiert die Perspektive, segmentiert das Werkzeug, erzeugt eine Aussenkontur und speichert diese masshaltig in Millimeter-Koordinaten.
+Ein Benutzer legt ein Werkzeug an, laedt ein Foto eines einzelnen Werkzeugs auf einem vollstaendig sichtbaren Hintergrund hoch und verwaltet den Datensatz in seiner persoenlichen Werkzeugbibliothek. ToolTrace erkennt den Hintergrund, korrigiert die Perspektive, segmentiert das Werkzeug, erzeugt eine Aussenkontur und speichert diese masshaltig in Millimeter-Koordinaten.
 
-Aktuelle Version: `0.5.0`
+Aktuelle Version: `0.5.5`
 
 ## Aktueller Stand
 
@@ -20,14 +20,23 @@ Implementiert ist aktuell:
 * Loeschen von Werkzeugen inklusive zugehoeriger Datenbankeintraege und Dateien
 * sicherer Bild-Upload fuer JPEG/PNG mit Pillow-Validierung
 * Speicherung von Upload-Metadaten und Dateien unter `storage/users/<user_id>/tools/<tool_id>/source/`
-* OpenCV-basierte DIN-A4-Erkennung mit markierter Vorschau unter `processed/`
-* Perspektivkorrektur erkannter DIN-A4-Blaetter mit konfigurierbarer Pixel-pro-Millimeter-Skalierung
-* OpenCV-Werkzeugsegmentierung fuer dunkle bzw. kontrastreiche Werkzeuge auf weissem DIN-A4-Blatt
+* User-Einstellungen fuer Leuchttisch-Hintergrundgroessen A3, A4 und A5
+* Upload-Auswahl fuer die Hintergrundgroesse, die als Massreferenz verwendet wird
+* OpenCV-basierte Hintergrunderkennung mit markierter Vorschau unter `processed/`
+* robustere Leuchttisch-Erkennung ueber grosse helle Flaechen in unterbelichteten Fotos
+* Perspektivkorrektur erkannter Hintergruende mit konfigurierbarer Pixel-pro-Millimeter-Skalierung
+* OpenCV-Werkzeugsegmentierung fuer dunkle bzw. kontrastreiche Werkzeuge auf hellem Hintergrund
 * robustere Hintergrundschaetzung, Beleuchtungskorrektur, Schattenreduktion und Kantenunterstuetzung fuer schmale Werkzeugbereiche
-* Maskenbereinigung mit Entfernung kleiner Stoerungen und Randartefakte am DIN-A4-Blatt
+* Maskenbereinigung mit Entfernung kleiner Stoerungen und Randartefakte am Hintergrundrand
 * Konturerkennung fuer die aeussere Werkzeugkontur
 * rote Kontur-Overlay-Vorschau mit 30 Prozent Transparenz
 * Ausrichtung der erkannten Aussenkontur ueber die minimale rotierte Bounding Box
+* manuelle Konturausrichtung ueber zwei vom User gewaehlte Punkte auf einer Werkzeugkante
+* automatische Projektion der gewaehlten Punkte auf die naechste Konturkante
+* optionale Raster-Bounding-Box, zum Beispiel fuer Gridfinity-Rastermasse
+* Konturglaettung und Konturvereinfachung als nicht-destruktive neue Konturversionen
+* Reset fuer Glaettung/Vereinfachung bis zur urspruenglichen nicht geglaetteten Konturversion
+* Bibliotheks-Thumbnails verwenden bevorzugt die aktive ausgerichtete oder bearbeitete Konturvorschau
 * Werkzeug-Koordinatensystem mit Ursprung links unten, X nach rechts und Y nach oben
 * Speicherung der Konturpunkte, Bounding Box, Flaeche und Umfang in Millimeterwerten
 * Quellreferenz der originalen Pixelkontur in den Geometriedaten
@@ -37,9 +46,8 @@ Implementiert ist aktuell:
 
 Noch nicht implementiert:
 
-* interaktiver Kontureditor
 * echter SVG-Export aus Werkzeugkonturen
-* Benutzeroberflaeche fuer Konturversatz, Konturvereinfachung und Layoutauswahl
+* Benutzeroberflaeche fuer Konturversatz und Layoutauswahl
 
 ## Voraussetzungen
 
@@ -127,7 +135,7 @@ Die Anwendung ist danach unter `http://127.0.0.1:5000` erreichbar.
 pytest
 ```
 
-Die Tests decken aktuell App-Erzeugung, Registrierung/Login, Werkzeuganlage, Upload-Metadaten, DIN-A4-Vorschau, Perspektivkorrektur, OpenCV-Segmentierung, Randartefakt-Filterung, Konturextraktion, Konturausrichtung, Gridfinity-Berechnung, Pixel-zu-Millimeter-Umrechnung und SVG-Grundausgabe ab.
+Die Tests decken aktuell App-Erzeugung, Registrierung/Login, Werkzeuganlage, Upload-Metadaten, Hintergrunderkennung, Leuchttisch-Erkennung, Perspektivkorrektur, OpenCV-Segmentierung, Randartefakt-Filterung, Konturextraktion, automatische und manuelle Konturausrichtung, Konturglaettung, Konturvereinfachung, Reset der Konturbearbeitung, Bibliotheksvorschauen, Gridfinity-Berechnung, Pixel-zu-Millimeter-Umrechnung und SVG-Grundausgabe ab.
 
 ## Dokumentation
 
@@ -146,7 +154,7 @@ app/
   auth/          Registrierung, Anmeldung, Abmeldung
   dashboard/     Benutzer-Dashboard
   tools/         Werkzeugbibliothek, Werkzeugformular, Upload, API
-  processing/    Bildverarbeitungspipeline, Blatterkennung, Segmentierung, Konturen
+  processing/    Bildverarbeitungspipeline, Hintergrunderkennung, Segmentierung, Konturen
   layouts/       Layoutservices und Gridfinity-Helfer
   exports/       SVG-Exportservice fuer Layout-Grundausgabe
   models/        SQLAlchemy-Modelle
@@ -164,22 +172,25 @@ Der aktuelle Ablauf nach einem Upload:
 
 1. Benutzer registriert sich und meldet sich an.
 2. Benutzer legt ein Werkzeug an.
-3. Benutzer laedt ein Foto eines Werkzeugs auf einem DIN-A4-Blatt hoch.
-4. ToolTrace erkennt das Blatt und korrigiert die Perspektive.
-5. ToolTrace segmentiert das Werkzeug auf dem entzerrten Blatt.
-6. ToolTrace bereinigt die Maske und entfernt Stoerungen am Blattrand.
+3. Benutzer waehlt die Hintergrundgroesse und laedt ein Foto eines Werkzeugs hoch.
+4. ToolTrace erkennt den Hintergrund und korrigiert die Perspektive.
+5. ToolTrace segmentiert das Werkzeug auf dem entzerrten Hintergrund.
+6. ToolTrace bereinigt die Maske und entfernt Stoerungen am Hintergrundrand.
 7. ToolTrace erzeugt die aeussere Werkzeugkontur.
 8. ToolTrace rechnet die Kontur in Millimeter um.
 9. ToolTrace richtet die Kontur in einem Werkzeug-Koordinatensystem aus.
-10. ToolTrace speichert Vorschaubilder, Messwerte und Geometriedaten am Werkzeug.
+10. Benutzer kann die Kontur manuell an einer gewaehlten Kante ausrichten.
+11. Benutzer kann die Kontur glaetten, vereinfachen oder diese Bearbeitung per Reset zuruecknehmen.
+12. ToolTrace speichert Vorschaubilder, Messwerte und Geometriedaten am Werkzeug.
 
 ## MVP-Zielbild
 
 Das naechste MVP-Ziel ist der vollstaendige Exportfluss:
 
 1. Benutzer prueft die automatisch erkannte Kontur.
-2. Benutzer waehlt Konturversatz, Konturvereinfachung und Layout.
-3. ToolTrace erzeugt eine masshaltige Vorschau.
-4. ToolTrace exportiert eine SVG-Datei mit der Werkzeugkontur.
+2. Benutzer richtet die Kontur bei Bedarf manuell aus und glaettet oder vereinfacht sie.
+3. Benutzer waehlt Konturversatz und Layout.
+4. ToolTrace erzeugt eine masshaltige Vorschau.
+5. ToolTrace exportiert eine SVG-Datei mit der Werkzeugkontur.
 
-Der aktuelle Stand bildet die Grundlage bis einschliesslich automatischer Konturerkennung, Millimeter-Umrechnung und Konturausrichtung ab.
+Der aktuelle Stand bildet die Grundlage bis einschliesslich automatischer Konturerkennung, Millimeter-Umrechnung, Konturausrichtung und nicht-destruktiver Konturbearbeitung ab.

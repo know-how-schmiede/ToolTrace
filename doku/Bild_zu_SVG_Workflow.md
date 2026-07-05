@@ -9,36 +9,40 @@ Wichtig: Der aktuelle Stand erzeugt bereits eine erkannte Aussenkontur in Millim
 Aus einem Foto soll eine verwertbare 2D-Kontur entstehen:
 
 1. Werkzeug fotografieren.
-2. Bild hochladen.
-3. DIN-A4-Blatt erkennen.
+2. Hintergrundgroesse auswaehlen und Bild hochladen.
+3. Hintergrund erkennen.
 4. Perspektive korrigieren.
-5. Werkzeug vom Blatt trennen.
+5. Werkzeug vom Hintergrund trennen.
 6. Maske bereinigen.
 7. Aussenkontur finden.
 8. Kontur in Millimeter umrechnen.
 9. Kontur ausrichten.
-10. Spaeter: Kontur als SVG exportieren.
+10. Kontur bei Bedarf manuell an einer Kante ausrichten.
+11. Kontur bei Bedarf glaetten oder vereinfachen.
+12. Spaeter: Kontur als SVG exportieren.
 
-Das DIN-A4-Blatt dient dabei als Massreferenz. Da ein DIN-A4-Blatt immer 210 mm x 297 mm gross ist, kann ToolTrace aus den Bildpixeln echte Millimeter berechnen.
+Der sichtbare Hintergrund dient dabei als Massreferenz. Das kann ein DIN-A4-Blatt sein oder ein Leuchttisch-Hintergrund, dessen Groesse der User in den Einstellungen pflegt und beim Upload auswaehlt. Aus dieser bekannten physischen Groesse kann ToolTrace echte Millimeter berechnen.
 
 ## 1. Foto vorbereiten
 
-Lege ein einzelnes Werkzeug auf ein weisses DIN-A4-Blatt.
+Lege ein einzelnes Werkzeug auf einen hellen, vollstaendig sichtbaren Hintergrund. Das kann ein weisses DIN-A4-Blatt oder ein Leuchttisch sein.
 
 Das Foto sollte so aufgenommen werden:
 
-* Das komplette DIN-A4-Blatt ist sichtbar.
-* Alle vier Blattkanten und Ecken sind im Bild.
-* Das Werkzeug liegt vollstaendig auf dem Blatt.
-* Es liegt nur ein Werkzeug auf dem Blatt.
-* Der Hintergrund ausserhalb des Blatts stoert moeglichst wenig.
+* Der komplette Hintergrund ist sichtbar.
+* Alle vier Hintergrundkanten und Ecken sind im Bild.
+* Das Werkzeug liegt vollstaendig auf dem Hintergrund.
+* Es liegt nur ein Werkzeug auf dem Hintergrund.
+* Der Hintergrund ausserhalb der Massreferenz stoert moeglichst wenig.
 * Das Bild ist scharf und gut beleuchtet.
 * Harte Schatten, Spiegelungen und sehr dunkle Raender werden moeglichst vermieden.
-* Das Werkzeug beruehrt den Blattrand nicht.
+* Das Werkzeug beruehrt den Hintergrundrand nicht.
 
 Warum das wichtig ist:
 
-ToolTrace sucht zuerst das DIN-A4-Blatt. Wenn das Blatt abgeschnitten, stark verdeckt oder kaum vom Hintergrund unterscheidbar ist, kann die automatische Verarbeitung nicht sicher starten. Danach sucht ToolTrace das Werkzeug innerhalb des entzerrten Blatts. Werkzeuge am Blattrand koennen deshalb als Randartefakt entfernt werden.
+ToolTrace sucht zuerst die Flaeche der Massreferenz. Wenn diese Flaeche abgeschnitten, stark verdeckt oder kaum vom Umfeld unterscheidbar ist, kann die automatische Verarbeitung nicht sicher starten. Danach sucht ToolTrace das Werkzeug innerhalb des entzerrten Hintergrunds. Werkzeuge am Rand koennen deshalb als Randartefakt entfernt werden.
+
+Bei Leuchttisch-Fotos ist das Umfeld oft stark unterbelichtet. ToolTrace sucht deshalb zuerst grosse helle Flaechen im dunklen Umfeld und nutzt die Kantenkontur-Erkennung als Fallback fuer normale Fotos.
 
 ## 2. Erlaubte Bilddateien
 
@@ -87,9 +91,9 @@ Einige dieser Namen sind Statusnamen. Die konkrete Verarbeitung ist aktuell in f
 * `app/processing/mask_cleanup.py`
 * `app/processing/contour_extraction.py`
 
-## 4. DIN-A4-Blatt erkennen
+## 4. Hintergrund erkennen
 
-Zuerst sucht ToolTrace das DIN-A4-Blatt im Foto.
+Zuerst sucht ToolTrace den ausgewaehlten Hintergrund im Foto.
 
 Bearbeitungsschritte:
 
@@ -99,8 +103,9 @@ Bearbeitungsschritte:
 4. Mit Gaussian Blur glaetten.
 5. Kanten mit Canny erkennen.
 6. Aeussere Konturen suchen.
-7. Vierseitige, konvexe Flaechen bewerten.
-8. Die beste Flaeche als DIN-A4-Blatt verwenden.
+7. Grosse helle Leuchttisch-Flaechen im dunklen Umfeld bewerten.
+8. Vierseitige, konvexe Flaechen bewerten.
+9. Die beste Flaeche als Hintergrund verwenden.
 
 Wichtige Parameter:
 
@@ -112,26 +117,26 @@ Wichtige Parameter:
 | Canny-Obergrenze | `150` | Oberer Schwellwert fuer Kanten. |
 | Mindestflaeche | `8 %` des Analysebildes | Sehr kleine Rechtecke werden ignoriert. |
 | Konturvereinfachung | `0.02 * Umfang` | Sucht eine vereinfachte Kontur mit vier Ecken. |
-| Erwartetes Seitenverhaeltnis | `210 / 297` | Entspricht DIN A4 im Hochformat. |
-| Mindestscore | `0.55` | Darunter gilt das Blatt als nicht sicher erkannt. |
+| Erwartetes Seitenverhaeltnis | ausgewaehlte Hintergrundgroesse | Entspricht dem beim Upload gewaehlten Hintergrund. |
+| Mindestscore | `0.55` | Darunter gilt der Hintergrund als nicht sicher erkannt. |
 
-Wenn ein Blatt erkannt wird, erzeugt ToolTrace eine Vorschau:
+Wenn ein Hintergrund erkannt wird, erzeugt ToolTrace eine Vorschau:
 
 ```text
 storage/users/<user_id>/tools/<tool_id>/processed/page_detected_job_<job_id>.png
 ```
 
-In dieser Vorschau wird das erkannte Blatt gruen markiert. Die gruene Flaeche hat `30 %` Deckkraft, die Blattkontur wird gruen gezeichnet und die vier Ecken werden nummeriert.
+In dieser Vorschau wird der erkannte Hintergrund gruen markiert. Die gruene Flaeche hat `30 %` Deckkraft, die Kontur wird gruen gezeichnet und die vier Ecken werden nummeriert.
 
 ## 5. Perspektive korrigieren
 
-Ein Foto wird fast nie exakt von oben aufgenommen. Deshalb sieht das DIN-A4-Blatt im Foto oft trapezfoermig aus. ToolTrace entzerrt das erkannte Blatt so, dass daraus wieder ein rechteckiges DIN-A4-Bild wird.
+Ein Foto wird fast nie exakt von oben aufgenommen. Deshalb sieht der Hintergrund im Foto oft trapezfoermig aus. ToolTrace entzerrt den erkannten Hintergrund so, dass daraus wieder ein rechteckiges Bild mit bekannter Millimetergroesse wird.
 
 Bearbeitungsschritte:
 
-1. Die vier erkannten Blattecken werden als Ausgangspunkte verwendet.
-2. ToolTrace prueft, ob das Blatt im Foto eher hoch oder quer liegt.
-3. Die Zielgroesse wird auf DIN A4 gesetzt.
+1. Die vier erkannten Hintergrund-Ecken werden als Ausgangspunkte verwendet.
+2. ToolTrace prueft, ob der Hintergrund im Foto eher hoch oder quer liegt.
+3. Die Zielgroesse wird aus der beim Upload gewaehlten Hintergrundgroesse gesetzt.
 4. Mit `cv2.getPerspectiveTransform` wird die Transformationsmatrix berechnet.
 5. Mit `cv2.warpPerspective` wird das Bild entzerrt.
 
@@ -139,14 +144,14 @@ Wichtige Parameter:
 
 | Parameter | Wert | Bedeutung |
 | --- | ---: | --- |
-| DIN-A4-Breite Hochformat | `210.0 mm` | Physische Blattbreite. |
-| DIN-A4-Hoehe Hochformat | `297.0 mm` | Physische Blatthoehe. |
+| Hintergrundbreite | User-Auswahl, z.B. `313.0 mm` | Physische Breite der Massreferenz. |
+| Hintergrundhoehe | User-Auswahl, z.B. `215.0 mm` | Physische Hoehe der Massreferenz. |
 | Pixel pro Millimeter | standardmaessig `10` | Bestimmt die Aufloesung des entzerrten Bildes. |
 
-Bei `10 px/mm` entsteht fuer ein hochformatiges DIN-A4-Blatt ein Bild mit ungefaehr:
+Bei `10 px/mm` entsteht fuer einen Leuchttisch A4 mit `313 x 215 mm` je nach Orientierung ein Bild mit ungefaehr:
 
 ```text
-2100 x 2970 px
+3130 x 2150 px
 ```
 
 Das perspektivisch korrigierte Bild wird gespeichert unter:
@@ -157,7 +162,7 @@ storage/users/<user_id>/tools/<tool_id>/processed/perspective_corrected_job_<job
 
 ## 6. Werkzeug segmentieren
 
-Nach der Perspektivkorrektur sucht ToolTrace das Werkzeug auf dem weissen Blatt. Dafuer wird aktuell der OpenCV-Backend verwendet.
+Nach der Perspektivkorrektur sucht ToolTrace das Werkzeug auf dem hellen Hintergrund. Dafuer wird aktuell der OpenCV-Backend verwendet.
 
 Ziel dieses Schritts:
 
@@ -167,13 +172,13 @@ Bearbeitungsschritte:
 
 1. Bild in Graustufen, HSV und LAB umwandeln.
 2. Beleuchtung im Graustufenbild normalisieren.
-3. Hintergrundfarbe aus den Blattbereichen am Rand schaetzen.
+3. Hintergrundfarbe aus den Bereichen am Rand schaetzen.
 4. Dunkle Bereiche erkennen.
 5. Farblich auffaellige Bereiche erkennen.
 6. Gesaettigte Bereiche erkennen.
 7. Kantenunterstuetzte dunkle Bereiche ergaenzen.
-8. Randbereiche des Blatts entfernen.
-9. Blattkanten-Artefakte entfernen.
+8. Randbereiche des Hintergrunds entfernen.
+9. Kanten-Artefakte am Hintergrundrand entfernen.
 10. Maske bereinigen.
 
 Wichtige Parameter:
@@ -181,16 +186,16 @@ Wichtige Parameter:
 | Parameter | Wert | Bedeutung |
 | --- | ---: | --- |
 | Beleuchtungskorrektur-Kernel | max. aus `51` und `9 %` der kurzen Bildseite | Gleicht weiche Helligkeitsunterschiede aus. |
-| Hintergrundrand fuer LAB-Samples | max. aus `10 px` und `8 %` der kurzen Bildseite | Dort wird die Blattfarbe geschaetzt. |
+| Hintergrundrand fuer LAB-Samples | max. aus `10 px` und `8 %` der kurzen Bildseite | Dort wird die Hintergrundfarbe geschaetzt. |
 | Dunkelgrenze | zwischen `152` und `198` | Wird aus der normalisierten Hintergrundhelligkeit abgeleitet. |
 | Sehr-dunkel-Grenze | `158` | Nimmt sehr dunkle Werkzeugteile sicher auf. |
-| LAB-Farbabstand | `> 38` | Erkennt Bereiche, die farblich vom Blatt abweichen. |
+| LAB-Farbabstand | `> 38` | Erkennt Bereiche, die farblich vom Hintergrund abweichen. |
 | LAB-Chroma-Abstand | `> 16` | Erkennt farbige Werkzeugteile. |
 | HSV-Saettigung | `> 60` | Erkennt gesaettigte Farben. |
 | Canny fuer Kantenhilfe | `18` bis `60` | Hilft bei dunklen Kanten und Schattenbereichen. |
 | Kanten-Dilatation | Ellipse `11 x 11`, `1` Iteration | Erweitert Kantenbereiche leicht. |
 | Aeusserer Maskenrand | max. aus `8 px` und `4 %` der kurzen Bildseite | Wird vor der Bereinigung auf Hintergrund gesetzt. |
-| Randartefakt-Marge | max. aus `12 px` und `7 %` der kurzen Bildseite | Entfernt Stoerungen an Blattkanten. |
+| Randartefakt-Marge | max. aus `12 px` und `7 %` der kurzen Bildseite | Entfernt Stoerungen an Hintergrundkanten. |
 
 Die Segmentierung erzeugt noch keine Kontur, sondern zuerst eine Maske. Diese Maske wird im naechsten Schritt bereinigt.
 
@@ -259,7 +264,7 @@ storage/users/<user_id>/tools/<tool_id>/contours/outer_contour_overlay_job_<job_
 
 ## 9. Kontur in Millimeter umrechnen
 
-Die Kontur entsteht zuerst in Pixelkoordinaten. Da die Perspektivkorrektur das DIN-A4-Blatt auf eine bekannte Groesse skaliert hat, kann ToolTrace Pixel in Millimeter umrechnen.
+Die Kontur entsteht zuerst in Pixelkoordinaten. Da die Perspektivkorrektur den Hintergrund auf eine bekannte Groesse skaliert hat, kann ToolTrace Pixel in Millimeter umrechnen.
 
 Standardwert:
 
@@ -330,7 +335,69 @@ In dieser Vorschau sieht man:
 * den Nullpunkt
 * X- und Y-Achse
 
-## 11. Aktueller Stand des SVG-Exports
+## 11. Kontur manuell an einer Kante ausrichten
+
+Die automatische Ausrichtung nutzt die laengste Kante der minimalen Bounding Box. Bei Werkzeugen mit schraegem Griff, Rundungen oder unklarer Hauptachse kann der User die fachlich richtige Kante selbst auswaehlen.
+
+Bearbeitungsschritte:
+
+1. Die Detailseite zeigt eine SVG-Vorschau der aktiven Kontur.
+2. Der User klickt zwei Punkte in der Naehe einer relevanten Werkzeugkante.
+3. ToolTrace projiziert die Klickpunkte automatisch auf das naechste Kontursegment.
+4. Aus den zwei korrigierten Punkten wird der Winkel der Kante berechnet.
+5. Die Kontur wird so gedreht, dass diese Kante parallel zur X-Achse liegt.
+6. Die Bounding Box wird danach neu berechnet.
+7. Optional wird eine Raster-Bounding-Box berechnet, zum Beispiel fuer `42 mm` Gridfinity.
+8. Die manuelle Ausrichtung wird als neue aktive Konturversion gespeichert.
+
+Das gespeicherte Geometrieformat enthaelt dann unter anderem:
+
+```text
+alignment method: user_selected_edge
+edge_start_mm: erster korrigierter Punkt
+edge_end_mm: zweiter korrigierter Punkt
+rotation_deg: angewendete Rotation
+raster_bounding_box_mm: optionale auf Rastermass gerundete Bounding Box
+```
+
+Die manuell ausgerichtete Vorschau wird gespeichert unter:
+
+```text
+storage/users/<user_id>/tools/<tool_id>/contours/manual_aligned_contour_<contour_id>.png
+```
+
+Diese Vorschau wird in der Werkzeugbibliothek bevorzugt als Thumbnail angezeigt, solange die manuell ausgerichtete Kontur aktiv ist.
+
+## 12. Kontur glaetten und vereinfachen
+
+Die erkannte Kontur kann kleine Zacken oder viele nahe beieinanderliegende Punkte enthalten. ToolTrace kann die aktive Kontur deshalb nicht-destruktiv glaetten und vereinfachen.
+
+Bearbeitungsschritte:
+
+1. Der User waehlt auf der Detailseite eine Glaettungsstaerke.
+2. Optional gibt der User eine Vereinfachungstoleranz in Millimeter an.
+3. ToolTrace glaettet die Kontur mit einem Chaikin-Verfahren.
+4. ToolTrace vereinfacht die Punkte mit Douglas-Peucker (`cv2.approxPolyDP`).
+5. Die Kontur wird wieder auf positive Millimeterkoordinaten normalisiert.
+6. Die Bounding Box wird neu berechnet.
+7. Die bearbeitete Kontur wird als neue aktive Konturversion gespeichert.
+
+Die Bearbeitung ueberschreibt die vorherige Kontur nicht. Dadurch kann der User verschiedene Staerken ausprobieren.
+
+Wichtige Bedienlogik:
+
+* `Keine`, `Leicht`, `Mittel`, `Stark` und `Sehr stark` steuern die Anzahl der Glaettungsdurchlaeufe.
+* Die Vereinfachungstoleranz in mm steuert, wie stark Punkte reduziert werden.
+* Reset nimmt auch mehrfach angewendete Glaettung/Vereinfachung bis zur urspruenglichen nicht geglaetteten Konturversion zurueck.
+* Die Bibliothek zeigt nur die Vorschau der aktuell aktiven Konturversion bevorzugt an.
+
+Die bearbeitete Konturvorschau wird gespeichert unter:
+
+```text
+storage/users/<user_id>/tools/<tool_id>/contours/edited_contour_<contour_id>.png
+```
+
+## 13. Aktueller Stand des SVG-Exports
 
 Der echte Export der erkannten Werkzeugkontur als SVG ist noch nicht fertig.
 
@@ -358,14 +425,14 @@ Das bedeutet:
 * Ein Layout-Rahmen kann bereits ausgegeben werden.
 * Die erkannte Werkzeugkontur wird noch nicht als SVG-Pfad geschrieben.
 
-## 12. Vorgesehener SVG-Schritt
+## 14. Vorgesehener SVG-Schritt
 
 Die Kontur liegt bereits als Liste von Millimeterpunkten vor. Fuer einen echten SVG-Export muss daraus ein SVG-Pfad oder Polygon erzeugt werden.
 
 Grundidee:
 
 1. `points_mm` aus der aktiven Kontur lesen.
-2. Optional Kontur vereinfachen.
+2. Aktuelle aktive Konturversion verwenden.
 3. Optional Konturversatz anwenden.
 4. Layoutgroesse berechnen.
 5. Punkte in SVG-Koordinaten umsetzen.
@@ -383,7 +450,7 @@ Wichtige vorbereitete Standardwerte:
 
 Diese Werte sind konfiguriert, aber der vollstaendige SVG-Exportpfad fuer Werkzeugkonturen ist noch nicht angebunden.
 
-## 13. Layoutberechnung
+## 15. Layoutberechnung
 
 ToolTrace enthaelt bereits einfache Layout-Helfer.
 
@@ -405,36 +472,37 @@ layout_height = grid_y * grid_unit_mm
 
 Mit dem Standardwert `42 mm` entsteht also immer eine Layoutgroesse, die auf volle Gridfinity-Zellen aufgerundet ist.
 
-## 14. Woran erkennt man ein gutes Ergebnis?
+## 16. Woran erkennt man ein gutes Ergebnis?
 
 Ein gutes Ergebnis sieht in ToolTrace so aus:
 
-* Die DIN-A4-Vorschau markiert genau das Blatt.
-* Die Perspektivkorrektur zeigt ein gerade entzerrtes Blatt.
-* Die Werkzeugmaske zeigt nur das Werkzeug, nicht den Blattrand.
+* Die Hintergrundvorschau markiert genau die Massreferenz.
+* Die Perspektivkorrektur zeigt einen gerade entzerrten Hintergrund.
+* Die Werkzeugmaske zeigt nur das Werkzeug, nicht den Hintergrundrand.
 * Die rote Aussenkontur deckt die Werkzeugform plausibel ab.
 * Die ausgerichtete Vorschau zeigt die Kontur vollstaendig in einer Bounding Box.
+* Manuelle Ausrichtung und Glaettung erzeugen nachvollziehbare neue Konturversionen.
 * Breite und Hoehe in Millimeter wirken realistisch.
 
-Wenn das Ergebnis schlecht ist, sollte zuerst das Foto verbessert werden. Besonders wichtig sind ein voll sichtbares DIN-A4-Blatt, gute Beleuchtung und Abstand des Werkzeugs zum Blattrand.
+Wenn das Ergebnis schlecht ist, sollte zuerst das Foto verbessert werden. Besonders wichtig sind ein voll sichtbarer Hintergrund, gute Beleuchtung und Abstand des Werkzeugs zum Hintergrundrand.
 
-## 15. Typische Probleme und Ursachen
+## 17. Typische Probleme und Ursachen
 
-### DIN-A4-Blatt wird nicht erkannt
+### Hintergrund wird nicht erkannt
 
 Moegliche Ursachen:
 
-* Eine oder mehrere Blattecken fehlen.
-* Das Blatt hebt sich zu wenig vom Hintergrund ab.
+* Eine oder mehrere Hintergrundecken fehlen.
+* Der Hintergrund hebt sich zu wenig vom Umfeld ab.
 * Das Foto ist unscharf.
 * Andere rechteckige Objekte im Bild stoeren.
-* Das Blatt ist zu klein im Foto.
+* Der Hintergrund ist zu klein im Foto.
 
 ### Werkzeugmaske ist leer
 
 Moegliche Ursachen:
 
-* Das Werkzeug hat zu wenig Kontrast zum Blatt.
+* Das Werkzeug hat zu wenig Kontrast zum Hintergrund.
 * Das Werkzeug ist sehr hell oder weiss.
 * Das Bild ist ueberbelichtet.
 * Schatten wurden staerker erkannt als das Werkzeug.
@@ -444,9 +512,9 @@ Moegliche Ursachen:
 Moegliche Ursachen:
 
 * Harte Schatten liegen direkt am Werkzeug.
-* Der Hintergrund oder Blattrand ist unruhig.
-* Das Werkzeug beruehrt den Blattrand.
-* Das Blatt ist verschmutzt oder stark strukturiert.
+* Der Hintergrundrand ist unruhig.
+* Das Werkzeug beruehrt den Hintergrundrand.
+* Der Hintergrund ist verschmutzt oder stark strukturiert.
 
 ### Kontur ist ungenau
 
@@ -457,8 +525,8 @@ Moegliche Ursachen:
 * Es gibt Spiegelungen.
 * Die Maske enthaelt Loecher oder Stoerflaechen.
 
-## 16. Kurzzusammenfassung fuer Einsteiger
+## 18. Kurzzusammenfassung fuer Einsteiger
 
-ToolTrace nutzt das DIN-A4-Blatt als Lineal. Zuerst wird das Blatt erkannt und geradegezogen. Danach trennt ToolTrace das Werkzeug vom weissen Blatt, bereinigt die Maske und sucht die aeussere Werkzeugkontur. Diese Kontur wird in Millimeter umgerechnet und so ausgerichtet, dass sie spaeter in ein Layout und eine SVG-Datei exportiert werden kann.
+ToolTrace nutzt den ausgewaehlten Hintergrund als Lineal. Zuerst wird die Massreferenz erkannt und geradegezogen. Danach trennt ToolTrace das Werkzeug vom Hintergrund, bereinigt die Maske und sucht die aeussere Werkzeugkontur. Diese Kontur wird in Millimeter umgerechnet, ausgerichtet und kann bei Bedarf manuell korrigiert, geglaettet oder vereinfacht werden. Die aktive Konturversion ist die Grundlage fuer Layout und spaeteren SVG-Export.
 
 Der wichtigste Praxistipp lautet: Ein gutes Foto ist der groesste Hebel fuer eine gute Kontur.
