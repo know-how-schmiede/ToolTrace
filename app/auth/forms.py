@@ -21,3 +21,13 @@ class LoginForm(FlaskForm):
     password = PasswordField("Passwort", validators=[DataRequired()])
     remember = BooleanField("Angemeldet bleiben")
     submit = SubmitField("Anmelden")
+
+
+class BackgroundSettingsForm(FlaskForm):
+    a4_width_cm = StringField("Breite A4", validators=[DataRequired(), Length(max=20)])
+    a4_height_cm = StringField("Hoehe A4", validators=[DataRequired(), Length(max=20)])
+    a5_width_cm = StringField("Breite A5", validators=[DataRequired(), Length(max=20)])
+    a5_height_cm = StringField("Hoehe A5", validators=[DataRequired(), Length(max=20)])
+    a3_width_cm = StringField("Breite A3", validators=[DataRequired(), Length(max=20)])
+    a3_height_cm = StringField("Hoehe A3", validators=[DataRequired(), Length(max=20)])
+    submit = SubmitField("Einstellungen speichern")

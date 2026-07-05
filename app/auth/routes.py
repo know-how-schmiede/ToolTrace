@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_user, logout_user
+from flask_login import current_user, login_required, login_user, logout_user
 
+from app.extensions import db
 from app.models import User
+from app.tools.backgrounds import cm_to_mm, format_mm_as_cm, user_background_presets
 
-from .forms import LoginForm, RegisterForm
+from .forms import BackgroundSettingsForm, LoginForm, RegisterForm
 from .services import AuthService
 
 bp = Blueprint("auth", __name__, url_prefix="", template_folder="templates")
@@ -55,6 +57,45 @@ def logout():
     logout_user()
     flash("Sie wurden abgemeldet.", "info")
     return redirect(url_for("auth.login"))
+
+
+@bp.route("/settings", methods=["GET", "POST"])
+@login_required
+def settings():
+    form = BackgroundSettingsForm()
+    preset_by_key = {preset.key: preset for preset in user_background_presets(current_user)}
+    fields_by_key = {
+        "light_table_a4": (form.a4_width_cm, form.a4_height_cm),
+        "light_table_a5": (form.a5_width_cm, form.a5_height_cm),
+        "light_table_a3": (form.a3_width_cm, form.a3_height_cm),
+    }
+    if request.method == "GET":
+        for key, (width_field, height_field) in fields_by_key.items():
+            preset = preset_by_key[key]
+            width_field.data = format_mm_as_cm(preset.width_mm)
+            height_field.data = format_mm_as_cm(preset.height_mm)
+
+    if form.validate_on_submit():
+        try:
+            presets = []
+            for key, (width_field, height_field) in fields_by_key.items():
+                preset = preset_by_key[key]
+                presets.append(
+                    {
+                        "key": key,
+                        "name": preset.name,
+                        "width_mm": cm_to_mm(width_field.data),
+                        "height_mm": cm_to_mm(height_field.data),
+                    }
+                )
+        except ValueError:
+            flash("Bitte geben Sie gueltige Hintergrundgroessen in Zentimetern ein.", "danger")
+        else:
+            current_user.background_presets_json = presets
+            db.session.commit()
+            flash("Einstellungen wurden gespeichert.", "success")
+            return redirect(url_for("auth.settings"))
+    return render_template("auth/settings.html", form=form)
 
 
 @bp.get("/forgot-password")

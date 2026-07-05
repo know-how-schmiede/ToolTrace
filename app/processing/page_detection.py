@@ -20,7 +20,12 @@ class PageDetectionResult:
 class PageDetectionService:
     expected_ratio = 210 / 297
 
-    def detect(self, image_path: str | Path) -> PageDetectionResult:
+    def detect(
+        self,
+        image_path: str | Path,
+        expected_width_mm: float = 210.0,
+        expected_height_mm: float = 297.0,
+    ) -> PageDetectionResult:
         image = cv2.imread(str(image_path))
         if image is None:
             return PageDetectionResult(found=False, warnings=["image_not_readable"])
@@ -33,12 +38,16 @@ class PageDetectionService:
 
         gray = cv2.cvtColor(analysis, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, 50, 150)
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         best_quad = None
         best_score = 0.0
         analysis_area = analysis.shape[0] * analysis.shape[1]
+        bright_candidate = self._detect_bright_background(blurred, analysis_area, expected_width_mm, expected_height_mm)
+        if bright_candidate is not None:
+            best_quad, best_score = bright_candidate
+
+        edges = cv2.Canny(blurred, 50, 150)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         for contour in contours:
             area = cv2.contourArea(contour)
@@ -51,7 +60,7 @@ class PageDetectionService:
 
             points = approx.reshape(4, 2).astype("float32")
             ordered = self._order_points(points)
-            ratio_score = self._ratio_score(ordered)
+            ratio_score = self._ratio_score(ordered, expected_width_mm, expected_height_mm)
             area_score = min(1.0, area / (analysis_area * 0.65))
             score = ratio_score * 0.75 + area_score * 0.25
             if score > best_score:
@@ -94,7 +103,7 @@ class PageDetectionService:
         else:
             cv2.putText(
                 image,
-                "DIN-A4-Blatt nicht erkannt",
+                "Hintergrund nicht erkannt",
                 (30, 60),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 1.2,
@@ -118,7 +127,50 @@ class PageDetectionService:
         rect[3] = points[np.argmax(point_diff)]
         return rect
 
-    def _ratio_score(self, ordered_points: np.ndarray) -> float:
+    def _detect_bright_background(
+        self,
+        gray: np.ndarray,
+        analysis_area: int,
+        expected_width_mm: float,
+        expected_height_mm: float,
+    ) -> tuple[np.ndarray, float] | None:
+        _, otsu_mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        high_percentile = np.percentile(gray, 82)
+        threshold_value = max(80, min(245, high_percentile - 8))
+        _, bright_mask = cv2.threshold(gray, threshold_value, 255, cv2.THRESH_BINARY)
+        mask = cv2.bitwise_or(otsu_mask, bright_mask)
+
+        close_size = max(15, int(round(max(gray.shape[:2]) * 0.025)))
+        if close_size % 2 == 0:
+            close_size += 1
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (close_size, close_size))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5, 5), dtype=np.uint8))
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        best_quad = None
+        best_score = 0.0
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area < analysis_area * 0.08 or area > analysis_area * 0.95:
+                continue
+
+            rect = cv2.minAreaRect(contour)
+            box = cv2.boxPoints(rect).astype("float32")
+            ordered = self._order_points(box)
+            ratio_score = self._ratio_score(ordered, expected_width_mm, expected_height_mm)
+            area_score = min(1.0, area / (analysis_area * 0.55))
+            fill_score = min(1.0, area / max(cv2.contourArea(box), 1.0))
+            score = ratio_score * 0.65 + area_score * 0.20 + fill_score * 0.15
+            if score > best_score:
+                best_quad = ordered
+                best_score = score
+
+        if best_quad is None or best_score < 0.55:
+            return None
+        return best_quad, best_score
+
+    def _ratio_score(self, ordered_points: np.ndarray, expected_width_mm: float, expected_height_mm: float) -> float:
         top_width = np.linalg.norm(ordered_points[1] - ordered_points[0])
         bottom_width = np.linalg.norm(ordered_points[2] - ordered_points[3])
         left_height = np.linalg.norm(ordered_points[3] - ordered_points[0])
@@ -126,5 +178,6 @@ class PageDetectionService:
         page_width = max((top_width + bottom_width) / 2, 1)
         page_height = max((left_height + right_height) / 2, 1)
         ratio = min(page_width / page_height, page_height / page_width)
-        ratio_error = abs(ratio - self.expected_ratio)
+        expected_ratio = min(expected_width_mm / expected_height_mm, expected_height_mm / expected_width_mm)
+        ratio_error = abs(ratio - expected_ratio)
         return max(0.0, 1.0 - ratio_error / 0.25)

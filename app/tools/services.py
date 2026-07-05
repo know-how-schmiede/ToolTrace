@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.models import AuditLog, SourceImage, Tool, ToolCategory
+from app.tools.backgrounds import BackgroundPreset
 
 
 DEFAULT_CATEGORIES = [
@@ -85,7 +86,7 @@ class UploadService:
     mime_by_format = {"JPEG": "image/jpeg", "PNG": "image/png"}
     extension_by_format = {"JPEG": ".jpg", "PNG": ".png"}
 
-    def save_source_image(self, *, tool: Tool, upload: FileStorage) -> SourceImage:
+    def save_source_image(self, *, tool: Tool, upload: FileStorage, background: BackgroundPreset) -> SourceImage:
         original_name = secure_filename(upload.filename or "upload")
         raw = upload.read()
         if not raw:
@@ -120,6 +121,10 @@ class UploadService:
             width_px=width,
             height_px=height,
             orientation="landscape" if width >= height else "portrait",
+            background_key=background.key,
+            background_name=background.name,
+            background_width_mm=background.width_mm,
+            background_height_mm=background.height_mm,
         )
         db.session.add(source_image)
         db.session.add(AuditLog(user_id=tool.user_id, action="image_uploaded", entity_type="tool", entity_id=tool.id))

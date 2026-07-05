@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 
 import cv2
@@ -95,6 +96,77 @@ class ContourExtractionService:
             perimeter_mm=0.0,
             warnings=warnings,
         )
+
+    def manual_align_geometry(
+        self,
+        geometry_data: dict,
+        *,
+        edge_start: tuple[float, float],
+        edge_end: tuple[float, float],
+        grid_size_mm: float | None = None,
+    ) -> dict:
+        points_mm = np.array(geometry_data.get("points_mm") or [], dtype="float32")
+        if len(points_mm) < 3:
+            raise ValueError("contour_points_required")
+
+        dx = edge_end[0] - edge_start[0]
+        dy = edge_end[1] - edge_start[1]
+        if math.hypot(dx, dy) <= 0.001:
+            raise ValueError("alignment_edge_required")
+
+        angle_rad = math.atan2(dy, dx)
+        rotation_rad = -angle_rad
+        cos_angle = math.cos(rotation_rad)
+        sin_angle = math.sin(rotation_rad)
+        rotation = np.array(
+            [
+                [cos_angle, -sin_angle],
+                [sin_angle, cos_angle],
+            ],
+            dtype="float32",
+        )
+
+        rotated_points = points_mm @ rotation.T
+        min_x = float(rotated_points[:, 0].min())
+        min_y = float(rotated_points[:, 1].min())
+        normalized_points = np.column_stack(
+            [
+                rotated_points[:, 0] - min_x,
+                rotated_points[:, 1] - min_y,
+            ]
+        )
+        width_mm = float(normalized_points[:, 0].max())
+        height_mm = float(normalized_points[:, 1].max())
+        normalized_points_mm = [
+            [round(float(x), 3), round(float(y), 3)]
+            for x, y in normalized_points
+        ]
+
+        updated = dict(geometry_data)
+        updated["points_mm"] = normalized_points_mm
+        updated["alignment"] = {
+            "method": "user_selected_edge",
+            "source_angle_deg": round(math.degrees(angle_rad), 3),
+            "rotation_deg": round(math.degrees(rotation_rad), 3),
+            "edge_start_mm": [round(float(edge_start[0]), 3), round(float(edge_start[1]), 3)],
+            "edge_end_mm": [round(float(edge_end[0]), 3), round(float(edge_end[1]), 3)],
+        }
+        updated["bounding_box_mm"] = {
+            "x": 0.0,
+            "y": 0.0,
+            "width": round(width_mm, 3),
+            "height": round(height_mm, 3),
+        }
+        updated["source_alignment"] = geometry_data.get("alignment")
+        if grid_size_mm and grid_size_mm > 0:
+            updated["raster_bounding_box_mm"] = {
+                "grid_size": round(float(grid_size_mm), 3),
+                "width": round(math.ceil(width_mm / grid_size_mm) * grid_size_mm, 3),
+                "height": round(math.ceil(height_mm / grid_size_mm) * grid_size_mm, 3),
+            }
+        else:
+            updated.pop("raster_bounding_box_mm", None)
+        return updated
 
     def _normalize_outer_contour(self, contour: np.ndarray, pixels_per_mm: float) -> dict:
         points = contour.reshape(-1, 2).astype("float32")

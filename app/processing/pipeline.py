@@ -70,8 +70,14 @@ class ToolProcessingPipeline:
             / f"page_detected_job_{job.id}.png"
         )
 
+        background_width_mm = job.source_image.background_width_mm or 210.0
+        background_height_mm = job.source_image.background_height_mm or 297.0
         detector = PageDetectionService()
-        result = detector.detect(source_path)
+        result = detector.detect(
+            source_path,
+            expected_width_mm=background_width_mm,
+            expected_height_mm=background_height_mm,
+        )
         preview_width, preview_height = detector.write_preview(source_path, result, preview_path)
 
         job.source_image.page_detection_score = result.score
@@ -103,6 +109,8 @@ class ToolProcessingPipeline:
                 result.corners,
                 corrected_path,
                 current_app.config["PROCESSING_PIXELS_PER_MM"],
+                page_width_mm=background_width_mm,
+                page_height_mm=background_height_mm,
             )
             db.session.add(
                 ProcessedImage(
@@ -218,7 +226,7 @@ class ToolProcessingPipeline:
             job.current_step = "detect_page"
             job.progress_percent = 20
             job.error_code = ",".join(result.warnings) or "page_not_found"
-            job.error_message = "DIN-A4-Blatt konnte nicht sicher erkannt werden."
+            job.error_message = "Hintergrund konnte nicht sicher erkannt werden."
             job.tool.status = "warning"
         job.finished_at = datetime.now(timezone.utc)
         db.session.commit()

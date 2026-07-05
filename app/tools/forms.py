@@ -13,6 +13,7 @@ class ToolForm(FlaskForm):
     inventory_number = StringField("Inventarnummer", validators=[Optional(), Length(max=120)])
     storage_location = StringField("Lagerort", validators=[Optional(), Length(max=255)])
     description = TextAreaField("Beschreibung")
+    background_key = SelectField("Hintergrundgroesse", validators=[DataRequired()])
     image = FileField(
         "Werkzeugfoto",
         validators=[
@@ -24,6 +25,7 @@ class ToolForm(FlaskForm):
 
 
 class UploadImageForm(FlaskForm):
+    background_key = SelectField("Hintergrundgroesse", validators=[DataRequired()])
     image = FileField(
         "Werkzeugfoto",
         validators=[DataRequired(), FileAllowed(["jpg", "jpeg", "png"], "Nur JPEG- und PNG-Dateien sind erlaubt.")],

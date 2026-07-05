@@ -71,3 +71,30 @@ def test_outer_contour_geometry_aligns_long_axis_to_x(tmp_path: Path):
     assert result.geometry_data["bounding_box_mm"]["width"] > result.geometry_data["bounding_box_mm"]["height"]
     assert min(point[0] for point in result.geometry_data["points_mm"]) >= 0
     assert min(point[1] for point in result.geometry_data["points_mm"]) >= 0
+
+
+def test_manual_alignment_rotates_selected_edge_to_x_axis():
+    geometry_data = {
+        "type": "outer_contour",
+        "coordinate_space": "tool_mm",
+        "origin": "bottom_left",
+        "axis": {"x": "right", "y": "up"},
+        "points_mm": [[0, 0], [10, 0], [10, 30], [0, 30]],
+        "bounding_box_mm": {"x": 0, "y": 0, "width": 10, "height": 30},
+        "alignment": {"method": "min_area_rect_long_axis"},
+    }
+
+    aligned = ContourExtractionService().manual_align_geometry(
+        geometry_data,
+        edge_start=(0, 0),
+        edge_end=(0, 30),
+        grid_size_mm=20,
+    )
+
+    assert aligned["alignment"]["method"] == "user_selected_edge"
+    assert aligned["bounding_box_mm"]["width"] == 30
+    assert aligned["bounding_box_mm"]["height"] == 10
+    assert aligned["raster_bounding_box_mm"]["width"] == 40
+    assert aligned["raster_bounding_box_mm"]["height"] == 20
+    assert min(point[0] for point in aligned["points_mm"]) == 0
+    assert min(point[1] for point in aligned["points_mm"]) == 0

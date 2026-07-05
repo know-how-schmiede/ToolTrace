@@ -17,15 +17,14 @@ class PerspectiveCorrectionResult:
 
 
 class PerspectiveCorrectionService:
-    portrait_width_mm = 210.0
-    portrait_height_mm = 297.0
-
     def correct(
         self,
         image_path: str | Path,
         page_corners: list[tuple[float, float]],
         output_path: str | Path,
         pixels_per_mm: float,
+        page_width_mm: float = 210.0,
+        page_height_mm: float = 297.0,
     ) -> PerspectiveCorrectionResult:
         image = cv2.imread(str(image_path))
         if image is None:
@@ -44,11 +43,11 @@ class PerspectiveCorrectionService:
         )
 
         if page_width_px > page_height_px:
-            output_width_mm = self.portrait_height_mm
-            output_height_mm = self.portrait_width_mm
+            output_width_mm = max(page_width_mm, page_height_mm)
+            output_height_mm = min(page_width_mm, page_height_mm)
         else:
-            output_width_mm = self.portrait_width_mm
-            output_height_mm = self.portrait_height_mm
+            output_width_mm = min(page_width_mm, page_height_mm)
+            output_height_mm = max(page_width_mm, page_height_mm)
 
         output_width_px = int(round(output_width_mm * pixels_per_mm))
         output_height_px = int(round(output_height_mm * pixels_per_mm))

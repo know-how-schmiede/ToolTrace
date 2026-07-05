@@ -24,10 +24,10 @@
       </section>
     {% endif %}
     <section class="mb-4">
-      <h2 class="h4">DIN-A4-Erkennung</h2>
+      <h2 class="h4">Hintergrunderkennung</h2>
       {% if page_previews %}
         {% set page_preview = page_previews[0] %}
-        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=page_preview.id) }}" alt="Vorschau der DIN-A4-Erkennung">
+        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=page_preview.id) }}" alt="Vorschau der Hintergrunderkennung">
         {% set latest_job = page_preview.processing_job %}
         <div class="mt-2">
           <span class="badge text-bg-secondary">{{ latest_job.status }}</span>
@@ -39,14 +39,14 @@
           <p class="text-secondary mt-2 mb-0">{{ latest_job.error_message }}</p>
         {% endif %}
       {% else %}
-        <p class="text-secondary">Noch keine Blatterkennung ausgefuehrt.</p>
+        <p class="text-secondary">Noch keine Hintergrunderkennung ausgefuehrt.</p>
       {% endif %}
     </section>
     <section class="mb-4">
       <h2 class="h4">Perspektivkorrektur</h2>
       {% if perspective_previews %}
         {% set perspective_preview = perspective_previews[0] %}
-        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=perspective_preview.id) }}" alt="Perspektivisch entzerrtes DIN-A4-Bild">
+        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=perspective_preview.id) }}" alt="Perspektivisch entzerrtes Hintergrundbild">
         <p class="text-secondary mt-2 mb-0">{{ perspective_preview.width_px }} x {{ perspective_preview.height_px }} px</p>
       {% else %}
         <p class="text-secondary">Noch keine Perspektivkorrektur ausgefuehrt.</p>
@@ -89,8 +89,59 @@
             <dt class="col-sm-4">Breite</dt><dd class="col-sm-8">{{ "%.1f"|format(active_contour.width_mm) }} mm</dd>
             <dt class="col-sm-4">Hoehe</dt><dd class="col-sm-8">{{ "%.1f"|format(active_contour.height_mm) }} mm</dd>
             <dt class="col-sm-4">Nullpunkt</dt><dd class="col-sm-8">links unten, X nach rechts, Y nach oben</dd>
+            {% if active_contour.geometry_data and active_contour.geometry_data.raster_bounding_box_mm %}
+              <dt class="col-sm-4">Rasterbox</dt>
+              <dd class="col-sm-8">
+                {{ "%.1f"|format(active_contour.geometry_data.raster_bounding_box_mm.width) }} x
+                {{ "%.1f"|format(active_contour.geometry_data.raster_bounding_box_mm.height) }} mm
+                bei {{ "%.1f"|format(active_contour.geometry_data.raster_bounding_box_mm.grid_size) }} mm
+              </dd>
+            {% endif %}
           </dl>
         {% endif %}
+      {% endif %}
+      {% if active_contour and active_contour.geometry_data and active_contour.geometry_data.points_mm %}
+        {% set contour_bbox = active_contour.geometry_data.bounding_box_mm %}
+        <div class="mt-4">
+          <h3 class="h5">Kante manuell ausrichten</h3>
+          <form method="post" action="{{ url_for('tools.manual_align_contour', tool_id=tool.id, contour_id=active_contour.id) }}" id="manualAlignForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="edge_start_x_mm" id="edgeStartX">
+            <input type="hidden" name="edge_start_y_mm" id="edgeStartY">
+            <input type="hidden" name="edge_end_x_mm" id="edgeEndX">
+            <input type="hidden" name="edge_end_y_mm" id="edgeEndY">
+            <div class="manual-align-stage mb-3">
+              <svg
+                id="manualAlignSvg"
+                class="manual-align-svg"
+                viewBox="-5 -5 {{ contour_bbox.width + 10 }} {{ contour_bbox.height + 10 }}"
+                data-height-mm="{{ contour_bbox.height }}"
+                role="img"
+                aria-label="Kontur zur manuellen Kantenauswahl"
+              >
+                <rect x="0" y="0" width="{{ contour_bbox.width }}" height="{{ contour_bbox.height }}" class="manual-align-bbox"></rect>
+                <polygon
+                  id="manualAlignContour"
+                  class="manual-align-contour"
+                  points="{% for point in active_contour.geometry_data.points_mm %}{{ point[0] }},{{ contour_bbox.height - point[1] }} {% endfor %}"
+                ></polygon>
+                <line id="manualAlignLine" class="manual-align-line" x1="0" y1="0" x2="0" y2="0"></line>
+                <circle id="manualAlignPointA" class="manual-align-point" cx="0" cy="0" r="0"></circle>
+                <circle id="manualAlignPointB" class="manual-align-point" cx="0" cy="0" r="0"></circle>
+              </svg>
+            </div>
+            <div class="row g-2 align-items-end">
+              <div class="col-sm-5">
+                <label class="form-label" for="gridSizeMm">Rastermass in mm</label>
+                <input class="form-control" id="gridSizeMm" name="grid_size_mm" inputmode="decimal" placeholder="42">
+              </div>
+              <div class="col-sm-7 d-flex gap-2">
+                <button class="btn btn-outline-secondary" type="button" id="manualAlignReset">Punkte neu setzen</button>
+                <button class="btn btn-primary" type="submit" id="manualAlignSubmit" disabled>Kante ausrichten</button>
+              </div>
+            </div>
+          </form>
+        </div>
       {% endif %}
     </section>
     <section class="mb-4">
@@ -107,7 +158,7 @@
       {% if tool.source_images %}
         <div class="table-responsive">
           <table class="table align-middle">
-            <thead><tr><th>Bild</th><th>Datei</th><th>Groesse</th><th>Format</th><th>Upload</th></tr></thead>
+            <thead><tr><th>Bild</th><th>Datei</th><th>Bildgroesse</th><th>Hintergrund</th><th>Format</th><th>Upload</th></tr></thead>
             <tbody>
               {% for image in tool.source_images %}
                 <tr>
@@ -116,6 +167,13 @@
                   </td>
                   <td>{{ image.original_filename }}</td>
                   <td>{{ image.width_px }} x {{ image.height_px }} px</td>
+                  <td>
+                    {% if image.background_name %}
+                      {{ image.background_name }} ({{ ("%.1f"|format(image.background_width_mm / 10)).replace(".", ",") }} x {{ ("%.1f"|format(image.background_height_mm / 10)).replace(".", ",") }} cm)
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
                   <td>{{ image.mime_type }}</td>
                   <td>{{ image.uploaded_at.strftime("%Y-%m-%d %H:%M") }}</td>
                 </tr>
@@ -131,13 +189,18 @@
   <div class="col-lg-5">
     <div class="upload-panel">
       <h2 class="h4">Bild hochladen</h2>
-      <p class="text-secondary">Ein Werkzeug auf vollstaendig sichtbarem DIN-A4-Blatt, JPEG oder PNG.</p>
+      <p class="text-secondary">Ein Werkzeug auf vollstaendig sichtbarem Hintergrund, JPEG oder PNG.</p>
       <form method="post" enctype="multipart/form-data">
         {{ upload_form.hidden_tag() }}
         {{ upload_form.image.label(class="form-label") }}
         {{ upload_form.image(class="form-control") }}
         {% for error in upload_form.image.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         <div class="form-text">JPEG oder PNG. Empfohlen sind mindestens 1200 x 1200 px; kleinere Bilder werden gespeichert und spaeter bewertet.</div>
+        <div class="mt-3">
+          {{ upload_form.background_key.label(class="form-label") }}
+          {{ upload_form.background_key(class="form-select") }}
+          {% for error in upload_form.background_key.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
         <button class="btn btn-primary mt-3" type="submit">Hochladen</button>
       </form>
     </div>
@@ -158,4 +221,112 @@
     </div>
   </div>
 </div>
+<script>
+  (() => {
+    const svg = document.getElementById("manualAlignSvg");
+    const form = document.getElementById("manualAlignForm");
+    if (!svg || !form) return;
+
+    const heightMm = Number(svg.dataset.heightMm);
+    const selected = [];
+    const pointA = document.getElementById("manualAlignPointA");
+    const pointB = document.getElementById("manualAlignPointB");
+    const line = document.getElementById("manualAlignLine");
+    const contour = document.getElementById("manualAlignContour");
+    const submit = document.getElementById("manualAlignSubmit");
+    const reset = document.getElementById("manualAlignReset");
+    const contourPoints = (contour.getAttribute("points") || "")
+      .trim()
+      .split(/\s+/)
+      .map((pair) => {
+        const [x, y] = pair.split(",").map(Number);
+        return { x, y };
+      })
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+    const fields = {
+      x1: document.getElementById("edgeStartX"),
+      y1: document.getElementById("edgeStartY"),
+      x2: document.getElementById("edgeEndX"),
+      y2: document.getElementById("edgeEndY"),
+    };
+
+    function svgPoint(event) {
+      const point = svg.createSVGPoint();
+      point.x = event.clientX;
+      point.y = event.clientY;
+      return point.matrixTransform(svg.getScreenCTM().inverse());
+    }
+
+    function nearestPointOnSegment(point, start, end) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const lengthSq = dx * dx + dy * dy;
+      if (lengthSq === 0) return { x: start.x, y: start.y };
+      const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq));
+      return {
+        x: start.x + t * dx,
+        y: start.y + t * dy,
+      };
+    }
+
+    function snapToContour(point) {
+      if (contourPoints.length < 2) return point;
+      let nearest = point;
+      let nearestDistanceSq = Number.POSITIVE_INFINITY;
+      contourPoints.forEach((start, index) => {
+        const end = contourPoints[(index + 1) % contourPoints.length];
+        const candidate = nearestPointOnSegment(point, start, end);
+        const dx = point.x - candidate.x;
+        const dy = point.y - candidate.y;
+        const distanceSq = dx * dx + dy * dy;
+        if (distanceSq < nearestDistanceSq) {
+          nearest = candidate;
+          nearestDistanceSq = distanceSq;
+        }
+      });
+      return nearest;
+    }
+
+    function render() {
+      const points = [pointA, pointB];
+      points.forEach((point, index) => {
+        if (selected[index]) {
+          point.setAttribute("cx", selected[index].x);
+          point.setAttribute("cy", selected[index].y);
+          point.setAttribute("r", "2.5");
+        } else {
+          point.setAttribute("r", "0");
+        }
+      });
+      if (selected.length === 2) {
+        line.setAttribute("x1", selected[0].x);
+        line.setAttribute("y1", selected[0].y);
+        line.setAttribute("x2", selected[1].x);
+        line.setAttribute("y2", selected[1].y);
+        fields.x1.value = selected[0].x.toFixed(3);
+        fields.y1.value = (heightMm - selected[0].y).toFixed(3);
+        fields.x2.value = selected[1].x.toFixed(3);
+        fields.y2.value = (heightMm - selected[1].y).toFixed(3);
+        submit.disabled = false;
+      } else {
+        line.setAttribute("x1", "0");
+        line.setAttribute("y1", "0");
+        line.setAttribute("x2", "0");
+        line.setAttribute("y2", "0");
+        submit.disabled = true;
+      }
+    }
+
+    svg.addEventListener("click", (event) => {
+      const point = snapToContour(svgPoint(event));
+      if (selected.length === 2) selected.length = 0;
+      selected.push({ x: point.x, y: point.y });
+      render();
+    });
+    reset.addEventListener("click", () => {
+      selected.length = 0;
+      render();
+    });
+  })();
+</script>
 {% endblock %}

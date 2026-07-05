@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen{% endblock %}
+{% block content %}
+<div class="form-shell-wide">
+  <h1>Einstellungen</h1>
+  <p class="text-secondary">Hintergrundgroessen fuer Foto-Uploads in Zentimetern.</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="table-responsive">
+      <table class="table align-middle bg-white border">
+        <thead>
+          <tr>
+            <th>Hintergrund</th>
+            <th>Breite</th>
+            <th>Hoehe</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Leuchttisch A4</td>
+            <td>{{ form.a4_width_cm(class="form-control", inputmode="decimal") }}</td>
+            <td>{{ form.a4_height_cm(class="form-control", inputmode="decimal") }}</td>
+          </tr>
+          <tr>
+            <td>Leuchttisch A5</td>
+            <td>{{ form.a5_width_cm(class="form-control", inputmode="decimal") }}</td>
+            <td>{{ form.a5_height_cm(class="form-control", inputmode="decimal") }}</td>
+          </tr>
+          <tr>
+            <td>Leuchttisch A3</td>
+            <td>{{ form.a3_width_cm(class="form-control", inputmode="decimal") }}</td>
+            <td>{{ form.a3_height_cm(class="form-control", inputmode="decimal") }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {% for field in [form.a4_width_cm, form.a4_height_cm, form.a5_width_cm, form.a5_height_cm, form.a3_width_cm, form.a3_height_cm] %}
+      {% for error in field.errors %}<div class="text-danger small">{{ field.label.text }}: {{ error }}</div>{% endfor %}
+    {% endfor %}
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+</div>
+{% endblock %}

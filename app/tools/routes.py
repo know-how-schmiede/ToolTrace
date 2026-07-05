@@ -7,8 +7,10 @@ from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.models import Contour, ProcessedImage, SourceImage, Tool, ToolCategory
+from app.processing.contour_extraction import ContourExtractionService
 from app.processing.pipeline import ToolProcessingPipeline
 
+from .backgrounds import background_choices_for_user, selected_background_for_user
 from .forms import ToolForm, UploadImageForm
 from .services import ToolService, UploadService, image_resolution_warning
 
@@ -25,6 +27,10 @@ def seed_default_categories_once():
 def populate_categories(form: ToolForm) -> None:
     categories = ToolCategory.query.order_by(ToolCategory.name.asc()).all()
     form.category_id.choices = [(0, "Keine Kategorie")] + [(category.id, category.name) for category in categories]
+
+
+def populate_backgrounds(form: ToolForm | UploadImageForm) -> None:
+    form.background_key.choices = background_choices_for_user(current_user)
 
 
 def default_tool_name_from_upload(filename: str | None) -> str:
@@ -52,6 +58,7 @@ def index():
 def new():
     form = ToolForm()
     populate_categories(form)
+    populate_backgrounds(form)
     if form.validate_on_submit():
         category_id = form.category_id.data or None
         upload = form.image.data
@@ -70,7 +77,8 @@ def new():
             },
         )
         try:
-            image = UploadService().save_source_image(tool=tool, upload=upload)
+            background = selected_background_for_user(current_user, form.background_key.data)
+            image = UploadService().save_source_image(tool=tool, upload=upload, background=background)
             job = ToolProcessingPipeline().enqueue_placeholder(tool=tool, source_image=image, user_id=current_user.id)
             ToolProcessingPipeline().run(job.id)
         except ValueError as exc:
@@ -92,9 +100,11 @@ def new():
 def detail(tool_id: int):
     tool = ToolService().user_tool_or_404(current_user.id, tool_id)
     upload_form = UploadImageForm()
+    populate_backgrounds(upload_form)
     if upload_form.validate_on_submit():
         try:
-            image = UploadService().save_source_image(tool=tool, upload=upload_form.image.data)
+            background = selected_background_for_user(current_user, upload_form.background_key.data)
+            image = UploadService().save_source_image(tool=tool, upload=upload_form.image.data, background=background)
             job = ToolProcessingPipeline().enqueue_placeholder(tool=tool, source_image=image, user_id=current_user.id)
             ToolProcessingPipeline().run(job.id)
         except ValueError as exc:
@@ -154,6 +164,50 @@ def detail(tool_id: int):
         aligned_contour_previews=aligned_contour_previews,
         active_contour=active_contour,
     )
+
+
+@bp.post("/<int:tool_id>/contours/<int:contour_id>/manual-align")
+@login_required
+def manual_align_contour(tool_id: int, contour_id: int):
+    tool = ToolService().user_tool_or_404(current_user.id, tool_id)
+    contour = Contour.query.filter_by(id=contour_id, tool_id=tool.id, is_active=True).first_or_404()
+    try:
+        edge_start = (float(request.form.get("edge_start_x_mm", "")), float(request.form.get("edge_start_y_mm", "")))
+        edge_end = (float(request.form.get("edge_end_x_mm", "")), float(request.form.get("edge_end_y_mm", "")))
+        grid_size_raw = (request.form.get("grid_size_mm") or "").strip().replace(",", ".")
+        grid_size_mm = float(grid_size_raw) if grid_size_raw else None
+        if grid_size_mm is not None and grid_size_mm <= 0:
+            raise ValueError("grid_size_invalid")
+        geometry_data = ContourExtractionService().manual_align_geometry(
+            contour.geometry_data or {},
+            edge_start=edge_start,
+            edge_end=edge_end,
+            grid_size_mm=grid_size_mm,
+        )
+    except (TypeError, ValueError):
+        flash("Bitte waehlen Sie zwei unterschiedliche Punkte auf einer Kante und ein gueltiges Rastermass.", "danger")
+        return redirect(url_for("tools.detail", tool_id=tool.id))
+
+    bounding_box = geometry_data["bounding_box_mm"]
+    Contour.query.filter_by(tool_id=tool.id, is_active=True).update({"is_active": False})
+    manual_contour = Contour(
+        tool_id=tool.id,
+        processing_job_id=contour.processing_job_id,
+        parent_contour_id=contour.id,
+        version=contour.version + 1,
+        contour_type="manual_aligned",
+        geometry_data=geometry_data,
+        width_mm=bounding_box["width"],
+        height_mm=bounding_box["height"],
+        area_mm2=contour.area_mm2,
+        perimeter_mm=contour.perimeter_mm,
+        rotation_deg=geometry_data["alignment"]["rotation_deg"],
+        is_active=True,
+    )
+    db.session.add(manual_contour)
+    db.session.commit()
+    flash("Kontur wurde anhand der gewaehlten Kante ausgerichtet.", "success")
+    return redirect(url_for("tools.detail", tool_id=tool.id))
 
 
 @bp.post("/<int:tool_id>/delete")

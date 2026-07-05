@@ -1,5 +1,30 @@
 # ToolTrace Timeline
 
+## 0.5.3 - 2026-07-05
+
+### Geaendert
+
+* Werkzeugkonturen koennen auf der Detailseite manuell ueber eine vom User gewaehlte Kante ausgerichtet werden.
+* Die manuelle Ausrichtung erzeugt eine neue aktive Kontur-Version und berechnet die Bounding Box danach neu.
+* Optionales Rastermass wird als gerundete Raster-Bounding-Box in den Konturdaten gespeichert.
+
+## 0.5.2 - 2026-07-05
+
+### Geaendert
+
+* Hintergrunderkennung erkennt Leuchttisch-Fotos robuster ueber die grosse helle Flaeche im unterbelichteten Umfeld.
+* Bestehende Kantenkontur-Erkennung bleibt als Fallback fuer normale Hintergrundfotos erhalten.
+* Regressionstest fuer unterbelichtete Leuchttischaufnahme mit heller Hintergrundflaeche ergaenzt.
+
+## 0.5.1 - 2026-07-05
+
+### Geaendert
+
+* User koennen in den Einstellungen die Masse fuer Leuchttisch-Hintergruende A3, A4 und A5 pflegen.
+* Foto-Uploads enthalten eine Auswahlbox fuer die Hintergrundgroesse.
+* Blatterkennung, Perspektivkorrektur und Millimeterskalierung verwenden die beim Upload gewaehlten Hintergrundmasse.
+* Bildlisten zeigen den beim Upload verwendeten Hintergrund mit Groesse an.
+
 ## 0.5.0 - 2026-07-04
 
 ### Geaendert

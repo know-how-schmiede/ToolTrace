@@ -32,6 +32,7 @@ def test_user_can_create_tool(client, app):
             "purpose": "Schaumstoffeinlage",
             "manufacturer": "Knipex",
             "model": "Demo",
+            "background_key": "light_table_a4",
             "image": (image_bytes, "kombizange.png"),
         },
         content_type="multipart/form-data",
@@ -58,7 +59,7 @@ def test_image_upload_stores_metadata_and_placeholder_job(client, app):
 
     response = client.post(
         f"/tools/{tool_id}",
-        data={"image": (image_bytes, "hammer.png")},
+        data={"background_key": "light_table_a4", "image": (image_bytes, "hammer.png")},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -72,6 +73,9 @@ def test_image_upload_stores_metadata_and_placeholder_job(client, app):
         assert source_image.original_filename == "hammer.png"
         assert source_image.width_px == 800
         assert source_image.mime_type == "image/png"
+        assert source_image.background_name == "Leuchttisch A4"
+        assert source_image.background_width_mm == 313.0
+        assert source_image.background_height_mm == 215.0
         assert job.status == "completed"
         assert job.current_step == "completed"
         assert source_image.page_detection_score is not None
@@ -97,6 +101,7 @@ def test_user_can_create_tool_with_initial_image_upload(client, app):
             "name": "Schraubendreher",
             "category_id": "0",
             "purpose": "Gridfinity-Einsatz",
+            "background_key": "light_table_a4",
             "image": (image_bytes, "schraubendreher.png"),
         },
         content_type="multipart/form-data",
@@ -115,6 +120,51 @@ def test_user_can_create_tool_with_initial_image_upload(client, app):
         assert job.current_step == "completed"
 
 
+def test_user_can_edit_background_sizes_and_select_them_for_upload(client, app):
+    register_and_login(client)
+
+    settings_response = client.post(
+        "/settings",
+        data={
+            "a4_width_cm": "31,3",
+            "a4_height_cm": "21,5",
+            "a5_width_cm": "21,5",
+            "a5_height_cm": "15,8",
+            "a3_width_cm": "43,0",
+            "a3_height_cm": "31,3",
+        },
+        follow_redirects=True,
+    )
+
+    assert settings_response.status_code == 200
+    assert "Einstellungen wurden gespeichert" in settings_response.get_data(as_text=True)
+
+    image_bytes = make_page_image_bytes()
+    response = client.post(
+        "/tools/new",
+        data={
+            "name": "Leuchttisch-Test",
+            "category_id": "0",
+            "background_key": "light_table_a4",
+            "image": (image_bytes, "leuchttisch.png"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Leuchttisch A4" in html
+
+    with app.app_context():
+        source_image = SourceImage.query.filter_by(original_filename="leuchttisch.png").one()
+        perspective_image = ProcessedImage.query.filter_by(image_type="perspective_corrected").one()
+        assert source_image.background_width_mm == 313.0
+        assert source_image.background_height_mm == 215.0
+        assert perspective_image.width_px == 2150
+        assert perspective_image.height_px == 3130
+
+
 def test_tool_library_renders_thumbnail_and_image_route(client, app):
     register_and_login(client)
     image_bytes = make_page_image_bytes()
@@ -124,6 +174,7 @@ def test_tool_library_renders_thumbnail_and_image_route(client, app):
         data={
             "name": "Thumbnail-Test",
             "category_id": "0",
+            "background_key": "light_table_a4",
             "image": (image_bytes, "thumbnail.png"),
         },
         content_type="multipart/form-data",
@@ -171,6 +222,55 @@ def test_tool_library_renders_thumbnail_and_image_route(client, app):
     assert aligned_contour_response.mimetype == "image/png"
 
 
+def test_user_can_manually_align_active_contour_edge(client, app):
+    register_and_login(client)
+    image_bytes = make_page_image_bytes()
+
+    client.post(
+        "/tools/new",
+        data={
+            "name": "Ausrichtung-Test",
+            "category_id": "0",
+            "background_key": "light_table_a4",
+            "image": (image_bytes, "ausrichtung.png"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    with app.app_context():
+        tool = Tool.query.filter_by(name="Ausrichtung-Test").one()
+        active_contour = Contour.query.filter_by(tool_id=tool.id, is_active=True).one()
+        height_mm = active_contour.geometry_data["bounding_box_mm"]["height"]
+        tool_id = tool.id
+        contour_id = active_contour.id
+
+    response = client.post(
+        f"/tools/{tool_id}/contours/{contour_id}/manual-align",
+        data={
+            "edge_start_x_mm": "0",
+            "edge_start_y_mm": "0",
+            "edge_end_x_mm": "0",
+            "edge_end_y_mm": str(height_mm),
+            "grid_size_mm": "42",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "Kontur wurde anhand der gewaehlten Kante ausgerichtet" in response.get_data(as_text=True)
+
+    with app.app_context():
+        contours = Contour.query.filter_by(tool_id=tool_id).order_by(Contour.version.asc()).all()
+        manual_contour = Contour.query.filter_by(tool_id=tool_id, is_active=True).one()
+        assert len(contours) == 2
+        assert contours[0].is_active is False
+        assert manual_contour.contour_type == "manual_aligned"
+        assert manual_contour.parent_contour_id == contour_id
+        assert manual_contour.geometry_data["alignment"]["method"] == "user_selected_edge"
+        assert manual_contour.geometry_data["raster_bounding_box_mm"]["grid_size"] == 42
+
+
 def test_small_image_upload_is_saved_with_warning(client, app):
     app.config["MIN_IMAGE_WIDTH"] = 1200
     app.config["MIN_IMAGE_HEIGHT"] = 1200
@@ -185,6 +285,7 @@ def test_small_image_upload_is_saved_with_warning(client, app):
             "name": "Mini",
             "category_id": "0",
             "purpose": "Upload-Test",
+            "background_key": "light_table_a4",
             "image": (image_bytes, "mini.png"),
         },
         content_type="multipart/form-data",
@@ -209,6 +310,7 @@ def test_photo_is_the_only_required_field_for_new_tool(client, app):
         "/tools/new",
         data={
             "category_id": "0",
+            "background_key": "light_table_a4",
             "image": (image_bytes, "nur-foto.png"),
         },
         content_type="multipart/form-data",
@@ -234,6 +336,7 @@ def test_invalid_required_photo_does_not_create_tool(client, app):
         data={
             "name": "Defekt",
             "category_id": "0",
+            "background_key": "light_table_a4",
             "image": (BytesIO(b"not an image"), "defekt.png"),
         },
         content_type="multipart/form-data",
@@ -257,6 +360,7 @@ def test_user_can_delete_tool_with_related_data_and_files(client, app):
         data={
             "name": "Loeschtest",
             "category_id": "0",
+            "background_key": "light_table_a4",
             "image": (image_bytes, "loeschtest.png"),
         },
         content_type="multipart/form-data",
