@@ -72,6 +72,12 @@ body {
   background: #eef2f6;
 }
 
+.tool-thumb-contain {
+  object-fit: contain;
+  padding: .5rem;
+  background: #fff;
+}
+
 .tool-thumb-empty {
   display: grid;
   place-items: center;

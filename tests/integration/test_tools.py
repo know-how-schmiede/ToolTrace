@@ -263,12 +263,17 @@ def test_user_can_manually_align_active_contour_edge(client, app):
     with app.app_context():
         contours = Contour.query.filter_by(tool_id=tool_id).order_by(Contour.version.asc()).all()
         manual_contour = Contour.query.filter_by(tool_id=tool_id, is_active=True).one()
+        manual_preview = ProcessedImage.query.filter_by(image_type="manual_aligned_contour_preview").one()
         assert len(contours) == 2
         assert contours[0].is_active is False
         assert manual_contour.contour_type == "manual_aligned"
         assert manual_contour.parent_contour_id == contour_id
         assert manual_contour.geometry_data["alignment"]["method"] == "user_selected_edge"
         assert manual_contour.geometry_data["raster_bounding_box_mm"]["grid_size"] == 42
+        manual_preview_url = f"/tools/{tool_id}/processed-images/{manual_preview.id}"
+
+    index_response = client.get("/tools/")
+    assert manual_preview_url in index_response.get_data(as_text=True)
 
 
 def test_small_image_upload_is_saved_with_warning(client, app):

@@ -6,13 +6,13 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import Contour, ProcessedImage, SourceImage, Tool, ToolCategory
+from app.models import Contour, ProcessedImage, ProcessingJob, SourceImage, Tool, ToolCategory
 from app.processing.contour_extraction import ContourExtractionService
 from app.processing.pipeline import ToolProcessingPipeline
 
 from .backgrounds import background_choices_for_user, selected_background_for_user
 from .forms import ToolForm, UploadImageForm
-from .services import ToolService, UploadService, image_resolution_warning
+from .services import StorageService, ToolService, UploadService, image_resolution_warning
 
 bp = Blueprint("tools", __name__, url_prefix="/tools", template_folder="templates")
 
@@ -50,7 +50,29 @@ def index():
     if status:
         query = query.filter_by(status=status)
     tools = query.order_by(Tool.updated_at.desc()).all()
-    return render_template("tools/index.html", tools=tools, q=q, status=status)
+    manual_preview_by_tool_id = {}
+    if tools:
+        tool_ids = [tool.id for tool in tools]
+        manual_previews = (
+            ProcessedImage.query.join(ProcessedImage.processing_job)
+            .filter(
+                ProcessedImage.image_type == "manual_aligned_contour_preview",
+                ProcessedImage.processing_job.has(ProcessingJob.tool_id.in_(tool_ids)),
+            )
+            .order_by(ProcessedImage.created_at.desc())
+            .all()
+        )
+        for preview in manual_previews:
+            tool_id = preview.processing_job.tool_id
+            if tool_id not in manual_preview_by_tool_id:
+                manual_preview_by_tool_id[tool_id] = preview
+    return render_template(
+        "tools/index.html",
+        tools=tools,
+        q=q,
+        status=status,
+        manual_preview_by_tool_id=manual_preview_by_tool_id,
+    )
 
 
 @bp.route("/new", methods=["GET", "POST"])
@@ -205,6 +227,27 @@ def manual_align_contour(tool_id: int, contour_id: int):
         is_active=True,
     )
     db.session.add(manual_contour)
+    db.session.flush()
+
+    storage_root = Path(current_app.config["STORAGE_PATH"]).resolve()
+    preview_path = (
+        StorageService().tool_root(tool.user_id, tool.id)
+        / "contours"
+        / f"manual_aligned_contour_{manual_contour.id}.png"
+    )
+    preview_width, preview_height = ContourExtractionService().write_geometry_preview(
+        geometry_data,
+        preview_path,
+    )
+    db.session.add(
+        ProcessedImage(
+            processing_job_id=contour.processing_job_id,
+            image_type="manual_aligned_contour_preview",
+            file_path=preview_path.relative_to(storage_root).as_posix(),
+            width_px=preview_width,
+            height_px=preview_height,
+        )
+    )
     db.session.commit()
     flash("Kontur wurde anhand der gewaehlten Kante ausgerichtet.", "success")
     return redirect(url_for("tools.detail", tool_id=tool.id))

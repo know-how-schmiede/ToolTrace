@@ -23,8 +23,11 @@
       <div class="col-md-6 col-xl-4">
         <div class="tool-card">
           {% set thumbnail = tool.source_images[0] if tool.source_images else none %}
+          {% set manual_preview = manual_preview_by_tool_id.get(tool.id) %}
           <a class="tool-thumb-link" href="{{ url_for('tools.detail', tool_id=tool.id) }}" aria-label="{{ tool.name }} oeffnen">
-            {% if thumbnail %}
+            {% if manual_preview %}
+              <img class="tool-thumb tool-thumb-contain" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=manual_preview.id) }}" alt="Ausgerichtete Kontur {{ tool.name }}">
+            {% elif thumbnail %}
               <img class="tool-thumb" src="{{ url_for('tools.source_image', tool_id=tool.id, image_id=thumbnail.id) }}" alt="Werkzeugfoto {{ tool.name }}">
             {% else %}
               <div class="tool-thumb tool-thumb-empty">Kein Bild</div>

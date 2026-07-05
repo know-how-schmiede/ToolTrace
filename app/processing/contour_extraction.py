@@ -168,6 +168,29 @@ class ContourExtractionService:
             updated.pop("raster_bounding_box_mm", None)
         return updated
 
+    def write_geometry_preview(
+        self,
+        geometry_data: dict,
+        output_path: str | Path,
+        *,
+        pixels_per_mm: float = 6.0,
+    ) -> tuple[int, int]:
+        points_mm = np.array(geometry_data.get("points_mm") or [], dtype="float32")
+        bounding_box = geometry_data.get("bounding_box_mm") or {}
+        width_mm = float(bounding_box.get("width") or 0)
+        height_mm = float(bounding_box.get("height") or 0)
+        if len(points_mm) < 3 or width_mm <= 0 or height_mm <= 0:
+            raise ValueError("contour_preview_points_required")
+
+        points_px = points_mm * pixels_per_mm
+        width_px = width_mm * pixels_per_mm
+        height_px = height_mm * pixels_per_mm
+        self._write_aligned_preview(points_px, width_px, height_px, output_path)
+        image = cv2.imread(str(output_path))
+        if image is None:
+            raise ValueError("contour_preview_not_written")
+        return image.shape[1], image.shape[0]
+
     def _normalize_outer_contour(self, contour: np.ndarray, pixels_per_mm: float) -> dict:
         points = contour.reshape(-1, 2).astype("float32")
         rect = cv2.minAreaRect(contour)

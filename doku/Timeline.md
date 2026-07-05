@@ -1,5 +1,12 @@
 # ToolTrace Timeline
 
+## 0.5.4 - 2026-07-05
+
+### Geaendert
+
+* Nach manueller Kantenausrichtung wird eine eigene Konturvorschau erzeugt und gespeichert.
+* Die Werkzeugbibliothek verwendet die manuell ausgerichtete Konturvorschau bevorzugt als Thumbnail.
+
 ## 0.5.3 - 2026-07-05
 
 ### Geaendert
