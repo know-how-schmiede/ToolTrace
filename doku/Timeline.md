@@ -1,5 +1,14 @@
 # ToolTrace Timeline
 
+## 0.5.5 - 2026-07-05
+
+### Geaendert
+
+* Konturen koennen auf der Detailseite als neue Version geglaettet und vereinfacht werden.
+* Glaettung nutzt eine einstellbare Staerke, Vereinfachung eine Millimeter-Toleranz.
+* Fuer bearbeitete Konturen wird eine neue Vorschau erzeugt und in der Bibliothek bevorzugt angezeigt.
+* Glaettung und Vereinfachung koennen per Reset bis zur urspruenglichen nicht geglaetteten Konturversion zurueckgenommen werden.
+
 ## 0.5.4 - 2026-07-05
 
 ### Geaendert

@@ -39,6 +39,14 @@ def default_tool_name_from_upload(filename: str | None) -> str:
     return stem[:180] or "Unbenanntes Werkzeug"
 
 
+def preview_match_for_active_contour(contour: Contour) -> tuple[str, str] | None:
+    if contour.contour_type == "manual_aligned":
+        return "manual_aligned_contour_preview", f"manual_aligned_contour_{contour.id}.png"
+    if contour.contour_type == "smoothed":
+        return "edited_contour_preview", f"edited_contour_{contour.id}.png"
+    return None
+
+
 @bp.get("/")
 @login_required
 def index():
@@ -53,18 +61,25 @@ def index():
     manual_preview_by_tool_id = {}
     if tools:
         tool_ids = [tool.id for tool in tools]
-        manual_previews = (
+        active_contours = Contour.query.filter(Contour.tool_id.in_(tool_ids), Contour.is_active.is_(True)).all()
+        active_preview_targets = {
+            contour.tool_id: preview_match
+            for contour in active_contours
+            if (preview_match := preview_match_for_active_contour(contour)) is not None
+        }
+        previews = (
             ProcessedImage.query.join(ProcessedImage.processing_job)
             .filter(
-                ProcessedImage.image_type == "manual_aligned_contour_preview",
+                ProcessedImage.image_type.in_(["manual_aligned_contour_preview", "edited_contour_preview"]),
                 ProcessedImage.processing_job.has(ProcessingJob.tool_id.in_(tool_ids)),
             )
             .order_by(ProcessedImage.created_at.desc())
             .all()
         )
-        for preview in manual_previews:
+        for preview in previews:
             tool_id = preview.processing_job.tool_id
-            if tool_id not in manual_preview_by_tool_id:
+            target = active_preview_targets.get(tool_id)
+            if target and preview.image_type == target[0] and preview.file_path.endswith(target[1]):
                 manual_preview_by_tool_id[tool_id] = preview
     return render_template(
         "tools/index.html",
@@ -250,6 +265,84 @@ def manual_align_contour(tool_id: int, contour_id: int):
     )
     db.session.commit()
     flash("Kontur wurde anhand der gewaehlten Kante ausgerichtet.", "success")
+    return redirect(url_for("tools.detail", tool_id=tool.id))
+
+
+@bp.post("/<int:tool_id>/contours/<int:contour_id>/smooth")
+@login_required
+def smooth_contour(tool_id: int, contour_id: int):
+    tool = ToolService().user_tool_or_404(current_user.id, tool_id)
+    contour = Contour.query.filter_by(id=contour_id, tool_id=tool.id, is_active=True).first_or_404()
+    try:
+        smoothing_level = int(request.form.get("smoothing_level", "0"))
+        tolerance_raw = (request.form.get("simplification_tolerance_mm") or "0").strip().replace(",", ".")
+        simplification_tolerance_mm = float(tolerance_raw)
+        geometry_data = ContourExtractionService().smooth_geometry(
+            contour.geometry_data or {},
+            smoothing_level=smoothing_level,
+            simplification_tolerance_mm=simplification_tolerance_mm,
+        )
+    except (TypeError, ValueError):
+        flash("Bitte waehlen Sie eine gueltige Glaettung und Vereinfachungstoleranz.", "danger")
+        return redirect(url_for("tools.detail", tool_id=tool.id))
+
+    bounding_box = geometry_data["bounding_box_mm"]
+    Contour.query.filter_by(tool_id=tool.id, is_active=True).update({"is_active": False})
+    edited_contour = Contour(
+        tool_id=tool.id,
+        processing_job_id=contour.processing_job_id,
+        parent_contour_id=contour.id,
+        version=contour.version + 1,
+        contour_type="smoothed",
+        geometry_data=geometry_data,
+        width_mm=bounding_box["width"],
+        height_mm=bounding_box["height"],
+        area_mm2=contour.area_mm2,
+        perimeter_mm=contour.perimeter_mm,
+        rotation_deg=contour.rotation_deg,
+        is_active=True,
+    )
+    db.session.add(edited_contour)
+    db.session.flush()
+
+    storage_root = Path(current_app.config["STORAGE_PATH"]).resolve()
+    preview_path = (
+        StorageService().tool_root(tool.user_id, tool.id)
+        / "contours"
+        / f"edited_contour_{edited_contour.id}.png"
+    )
+    preview_width, preview_height = ContourExtractionService().write_geometry_preview(geometry_data, preview_path)
+    db.session.add(
+        ProcessedImage(
+            processing_job_id=contour.processing_job_id,
+            image_type="edited_contour_preview",
+            file_path=preview_path.relative_to(storage_root).as_posix(),
+            width_px=preview_width,
+            height_px=preview_height,
+        )
+    )
+    db.session.commit()
+    flash("Kontur wurde geglaettet und als neue Version gespeichert.", "success")
+    return redirect(url_for("tools.detail", tool_id=tool.id))
+
+
+@bp.post("/<int:tool_id>/contours/<int:contour_id>/reset-smoothing")
+@login_required
+def reset_smoothing(tool_id: int, contour_id: int):
+    tool = ToolService().user_tool_or_404(current_user.id, tool_id)
+    contour = Contour.query.filter_by(id=contour_id, tool_id=tool.id, is_active=True).first_or_404()
+    if contour.contour_type != "smoothed" or not contour.parent_contour_id:
+        flash("Fuer diese Kontur gibt es keine Glaettung, die zurueckgenommen werden kann.", "warning")
+        return redirect(url_for("tools.detail", tool_id=tool.id))
+
+    reset_target = Contour.query.filter_by(id=contour.parent_contour_id, tool_id=tool.id).first_or_404()
+    while reset_target.contour_type == "smoothed" and reset_target.parent_contour_id:
+        reset_target = Contour.query.filter_by(id=reset_target.parent_contour_id, tool_id=tool.id).first_or_404()
+
+    contour.is_active = False
+    reset_target.is_active = True
+    db.session.commit()
+    flash("Glaettung und Vereinfachung wurden zurueckgenommen.", "success")
     return redirect(url_for("tools.detail", tool_id=tool.id))
 
 

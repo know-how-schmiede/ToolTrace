@@ -103,6 +103,37 @@
       {% if active_contour and active_contour.geometry_data and active_contour.geometry_data.points_mm %}
         {% set contour_bbox = active_contour.geometry_data.bounding_box_mm %}
         <div class="mt-4">
+          <h3 class="h5">Kontur glaetten und vereinfachen</h3>
+          <form method="post" action="{{ url_for('tools.smooth_contour', tool_id=tool.id, contour_id=active_contour.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-2 align-items-end">
+              <div class="col-sm-5">
+                <label class="form-label" for="smoothingLevel">Glaettung</label>
+                <select class="form-select" id="smoothingLevel" name="smoothing_level">
+                  <option value="0">Keine</option>
+                  <option value="1">Leicht</option>
+                  <option value="2" selected>Mittel</option>
+                  <option value="3">Stark</option>
+                  <option value="4">Sehr stark</option>
+                </select>
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label" for="simplificationTolerance">Vereinfachung mm</label>
+                <input class="form-control" id="simplificationTolerance" name="simplification_tolerance_mm" inputmode="decimal" value="0,5">
+              </div>
+              <div class="col-sm-3">
+                <button class="btn btn-outline-primary w-100" type="submit">Anwenden</button>
+              </div>
+            </div>
+          </form>
+          {% if active_contour.contour_type == "smoothed" and active_contour.parent_contour_id %}
+            <form class="mt-2" method="post" action="{{ url_for('tools.reset_smoothing', tool_id=tool.id, contour_id=active_contour.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-secondary" type="submit">Glaettung zuruecknehmen</button>
+            </form>
+          {% endif %}
+        </div>
+        <div class="mt-4">
           <h3 class="h5">Kante manuell ausrichten</h3>
           <form method="post" action="{{ url_for('tools.manual_align_contour', tool_id=tool.id, contour_id=active_contour.id) }}" id="manualAlignForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

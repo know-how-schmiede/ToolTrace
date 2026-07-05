@@ -168,6 +168,54 @@ class ContourExtractionService:
             updated.pop("raster_bounding_box_mm", None)
         return updated
 
+    def smooth_geometry(
+        self,
+        geometry_data: dict,
+        *,
+        smoothing_level: int = 0,
+        simplification_tolerance_mm: float = 0.0,
+    ) -> dict:
+        points_mm = np.array(geometry_data.get("points_mm") or [], dtype="float32")
+        if len(points_mm) < 3:
+            raise ValueError("contour_points_required")
+        if smoothing_level < 0 or smoothing_level > 4:
+            raise ValueError("smoothing_level_invalid")
+        if simplification_tolerance_mm < 0 or simplification_tolerance_mm > 10:
+            raise ValueError("simplification_tolerance_invalid")
+
+        edited_points = points_mm
+        for _ in range(smoothing_level):
+            edited_points = self._chaikin_closed(edited_points)
+
+        if simplification_tolerance_mm > 0:
+            contour = edited_points.reshape((-1, 1, 2)).astype("float32")
+            simplified = cv2.approxPolyDP(contour, simplification_tolerance_mm, True)
+            if len(simplified) >= 3:
+                edited_points = simplified.reshape(-1, 2).astype("float32")
+
+        normalized_points, width_mm, height_mm = self._normalize_points_mm(edited_points)
+        updated = dict(geometry_data)
+        updated["points_mm"] = [
+            [round(float(x), 3), round(float(y), 3)]
+            for x, y in normalized_points
+        ]
+        updated["bounding_box_mm"] = {
+            "x": 0.0,
+            "y": 0.0,
+            "width": round(width_mm, 3),
+            "height": round(height_mm, 3),
+        }
+        updated["smoothing"] = {
+            "method": "chaikin_and_douglas_peucker",
+            "level": smoothing_level,
+            "simplification_tolerance_mm": round(float(simplification_tolerance_mm), 3),
+            "source_point_count": int(len(points_mm)),
+            "result_point_count": int(len(normalized_points)),
+        }
+        updated["source_smoothing"] = geometry_data.get("smoothing")
+        updated.pop("raster_bounding_box_mm", None)
+        return updated
+
     def write_geometry_preview(
         self,
         geometry_data: dict,
@@ -190,6 +238,27 @@ class ContourExtractionService:
         if image is None:
             raise ValueError("contour_preview_not_written")
         return image.shape[1], image.shape[0]
+
+    def _chaikin_closed(self, points: np.ndarray) -> np.ndarray:
+        smoothed = []
+        for index, current in enumerate(points):
+            next_point = points[(index + 1) % len(points)]
+            smoothed.append(current * 0.75 + next_point * 0.25)
+            smoothed.append(current * 0.25 + next_point * 0.75)
+        return np.array(smoothed, dtype="float32")
+
+    def _normalize_points_mm(self, points: np.ndarray) -> tuple[np.ndarray, float, float]:
+        min_x = float(points[:, 0].min())
+        min_y = float(points[:, 1].min())
+        normalized = np.column_stack(
+            [
+                points[:, 0] - min_x,
+                points[:, 1] - min_y,
+            ]
+        ).astype("float32")
+        width_mm = float(normalized[:, 0].max())
+        height_mm = float(normalized[:, 1].max())
+        return normalized, width_mm, height_mm
 
     def _normalize_outer_contour(self, contour: np.ndarray, pixels_per_mm: float) -> dict:
         points = contour.reshape(-1, 2).astype("float32")

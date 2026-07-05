@@ -4,6 +4,7 @@ from io import BytesIO
 
 from PIL import Image, ImageDraw
 
+from app.extensions import db
 from app.models import Contour, ProcessedImage, ProcessingJob, SourceImage, Tool, User
 from app.tools.services import StorageService, ToolService
 from tests.conftest import register_and_login
@@ -274,6 +275,98 @@ def test_user_can_manually_align_active_contour_edge(client, app):
 
     index_response = client.get("/tools/")
     assert manual_preview_url in index_response.get_data(as_text=True)
+
+
+def test_user_can_smooth_active_contour_and_library_uses_preview(client, app):
+    register_and_login(client)
+    image_bytes = make_page_image_bytes()
+
+    client.post(
+        "/tools/new",
+        data={
+            "name": "Glaettung-Test",
+            "category_id": "0",
+            "background_key": "light_table_a4",
+            "image": (image_bytes, "glaettung.png"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    with app.app_context():
+        tool = Tool.query.filter_by(name="Glaettung-Test").one()
+        active_contour = Contour.query.filter_by(tool_id=tool.id, is_active=True).one()
+        tool_id = tool.id
+        contour_id = active_contour.id
+
+    response = client.post(
+        f"/tools/{tool_id}/contours/{contour_id}/smooth",
+        data={
+            "smoothing_level": "2",
+            "simplification_tolerance_mm": "0,5",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "Kontur wurde geglaettet" in response.get_data(as_text=True)
+
+    with app.app_context():
+        contours = Contour.query.filter_by(tool_id=tool_id).order_by(Contour.version.asc()).all()
+        smoothed_contour = Contour.query.filter_by(tool_id=tool_id, is_active=True).one()
+        edited_preview = ProcessedImage.query.filter_by(image_type="edited_contour_preview").one()
+        source_image = SourceImage.query.filter_by(tool_id=tool_id).one()
+        assert len(contours) == 2
+        assert contours[0].is_active is False
+        assert smoothed_contour.contour_type == "smoothed"
+        assert smoothed_contour.parent_contour_id == contour_id
+        assert smoothed_contour.geometry_data["smoothing"]["level"] == 2
+        assert smoothed_contour.geometry_data["smoothing"]["simplification_tolerance_mm"] == 0.5
+        edited_preview_url = f"/tools/{tool_id}/processed-images/{edited_preview.id}"
+        source_image_url = f"/tools/{tool_id}/images/{source_image.id}"
+        smoothed_contour_id = smoothed_contour.id
+
+    index_response = client.get("/tools/")
+    assert edited_preview_url in index_response.get_data(as_text=True)
+
+    second_response = client.post(
+        f"/tools/{tool_id}/contours/{smoothed_contour_id}/smooth",
+        data={
+            "smoothing_level": "1",
+            "simplification_tolerance_mm": "0,3",
+        },
+        follow_redirects=True,
+    )
+
+    assert second_response.status_code == 200
+    assert "Kontur wurde geglaettet" in second_response.get_data(as_text=True)
+
+    with app.app_context():
+        second_smoothed_contour = Contour.query.filter_by(tool_id=tool_id, is_active=True).one()
+        assert second_smoothed_contour.contour_type == "smoothed"
+        assert second_smoothed_contour.parent_contour_id == smoothed_contour_id
+        second_smoothed_contour_id = second_smoothed_contour.id
+
+    reset_response = client.post(
+        f"/tools/{tool_id}/contours/{second_smoothed_contour_id}/reset-smoothing",
+        follow_redirects=True,
+    )
+
+    assert reset_response.status_code == 200
+    assert "Glaettung und Vereinfachung wurden zurueckgenommen" in reset_response.get_data(as_text=True)
+
+    with app.app_context():
+        active_contour = Contour.query.filter_by(tool_id=tool_id, is_active=True).one()
+        reset_contour = db.session.get(Contour, second_smoothed_contour_id)
+        first_smoothed_contour = db.session.get(Contour, smoothed_contour_id)
+        assert active_contour.id == contour_id
+        assert reset_contour.is_active is False
+        assert first_smoothed_contour.is_active is False
+
+    index_response = client.get("/tools/")
+    html = index_response.get_data(as_text=True)
+    assert edited_preview_url not in html
+    assert source_image_url in html
 
 
 def test_small_image_upload_is_saved_with_warning(client, app):

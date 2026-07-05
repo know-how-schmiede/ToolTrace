@@ -98,3 +98,29 @@ def test_manual_alignment_rotates_selected_edge_to_x_axis():
     assert aligned["raster_bounding_box_mm"]["height"] == 20
     assert min(point[0] for point in aligned["points_mm"]) == 0
     assert min(point[1] for point in aligned["points_mm"]) == 0
+
+
+def test_smooth_geometry_creates_new_simplified_points():
+    geometry_data = {
+        "type": "outer_contour",
+        "coordinate_space": "tool_mm",
+        "origin": "bottom_left",
+        "axis": {"x": "right", "y": "up"},
+        "points_mm": [[0, 0], [5, 1], [10, 0], [10, 10], [5, 9], [0, 10]],
+        "bounding_box_mm": {"x": 0, "y": 0, "width": 10, "height": 10},
+    }
+
+    smoothed = ContourExtractionService().smooth_geometry(
+        geometry_data,
+        smoothing_level=1,
+        simplification_tolerance_mm=0.4,
+    )
+
+    assert smoothed["smoothing"]["method"] == "chaikin_and_douglas_peucker"
+    assert smoothed["smoothing"]["level"] == 1
+    assert smoothed["smoothing"]["simplification_tolerance_mm"] == 0.4
+    assert len(smoothed["points_mm"]) >= 3
+    assert smoothed["bounding_box_mm"]["width"] > 0
+    assert smoothed["bounding_box_mm"]["height"] > 0
+    assert min(point[0] for point in smoothed["points_mm"]) == 0
+    assert min(point[1] for point in smoothed["points_mm"]) == 0
