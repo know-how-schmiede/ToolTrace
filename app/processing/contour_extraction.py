@@ -216,12 +216,68 @@ class ContourExtractionService:
         updated.pop("raster_bounding_box_mm", None)
         return updated
 
+    def offset_geometry(
+        self,
+        geometry_data: dict,
+        *,
+        offset_mm: float,
+    ) -> dict:
+        points_mm = np.array(geometry_data.get("points_mm") or [], dtype="float32")
+        if len(points_mm) < 3:
+            raise ValueError("contour_points_required")
+        if offset_mm <= 0 or offset_mm > 20:
+            raise ValueError("offset_invalid")
+
+        scale_px_per_mm = 8.0
+        radius_px = max(1, int(math.ceil(offset_mm * scale_px_per_mm)))
+        padding_px = max(32, radius_px + 16)
+        points_px = (points_mm * scale_px_per_mm + padding_px).round().astype("int32")
+        width_px = int(math.ceil(float(points_mm[:, 0].max()) * scale_px_per_mm)) + padding_px * 2 + radius_px * 2
+        height_px = int(math.ceil(float(points_mm[:, 1].max()) * scale_px_per_mm)) + padding_px * 2 + radius_px * 2
+
+        mask = np.zeros((height_px, width_px), dtype=np.uint8)
+        cv2.fillPoly(mask, [points_px], 255)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (radius_px * 2 + 1, radius_px * 2 + 1))
+        dilated = cv2.dilate(mask, kernel, iterations=1)
+        contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            raise ValueError("offset_contour_not_found")
+
+        offset_contour = max(contours, key=cv2.contourArea).reshape(-1, 2).astype("float32")
+        offset_points_mm = (offset_contour - padding_px) / scale_px_per_mm
+        normalized_points, width_mm, height_mm = self._normalize_points_mm(offset_points_mm)
+        if len(normalized_points) < 3:
+            raise ValueError("offset_contour_not_found")
+
+        updated = dict(geometry_data)
+        updated["points_mm"] = [
+            [round(float(x), 3), round(float(y), 3)]
+            for x, y in normalized_points
+        ]
+        updated["bounding_box_mm"] = {
+            "x": 0.0,
+            "y": 0.0,
+            "width": round(width_mm, 3),
+            "height": round(height_mm, 3),
+        }
+        updated["offset"] = {
+            "method": "raster_dilate_external",
+            "distance_mm": round(float(offset_mm), 3),
+            "source_point_count": int(len(points_mm)),
+            "result_point_count": int(len(normalized_points)),
+            "scale_px_per_mm": scale_px_per_mm,
+        }
+        updated["source_offset"] = geometry_data.get("offset")
+        updated.pop("raster_bounding_box_mm", None)
+        return updated
+
     def write_geometry_preview(
         self,
         geometry_data: dict,
         output_path: str | Path,
         *,
         pixels_per_mm: float = 6.0,
+        style: str = "filled_red",
     ) -> tuple[int, int]:
         points_mm = np.array(geometry_data.get("points_mm") or [], dtype="float32")
         bounding_box = geometry_data.get("bounding_box_mm") or {}
@@ -233,7 +289,7 @@ class ContourExtractionService:
         points_px = points_mm * pixels_per_mm
         width_px = width_mm * pixels_per_mm
         height_px = height_mm * pixels_per_mm
-        self._write_aligned_preview(points_px, width_px, height_px, output_path)
+        self._write_aligned_preview(points_px, width_px, height_px, output_path, style=style)
         image = cv2.imread(str(output_path))
         if image is None:
             raise ValueError("contour_preview_not_written")
@@ -327,6 +383,8 @@ class ContourExtractionService:
         width_px: float,
         height_px: float,
         output_path: str | Path,
+        *,
+        style: str = "filled_red",
     ) -> None:
         margin = 32
         max_preview_side = 720
@@ -348,10 +406,13 @@ class ContourExtractionService:
             margin + int(round(height_px * scale)),
         )
 
-        fill_layer = canvas.copy()
-        cv2.fillPoly(fill_layer, [preview_points], (0, 0, 255))
-        canvas = cv2.addWeighted(fill_layer, 0.30, canvas, 0.70, 0)
-        cv2.polylines(canvas, [preview_points], True, (0, 0, 180), 2, cv2.LINE_AA)
+        if style == "green_outline":
+            cv2.polylines(canvas, [preview_points], True, (0, 150, 0), 3, cv2.LINE_AA)
+        else:
+            fill_layer = canvas.copy()
+            cv2.fillPoly(fill_layer, [preview_points], (0, 0, 255))
+            canvas = cv2.addWeighted(fill_layer, 0.30, canvas, 0.70, 0)
+            cv2.polylines(canvas, [preview_points], True, (0, 0, 180), 2, cv2.LINE_AA)
         cv2.rectangle(canvas, bbox_top_left, bbox_bottom_right, (255, 90, 0), 2, cv2.LINE_AA)
 
         origin = (margin, bbox_bottom_right[1])

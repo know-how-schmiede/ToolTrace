@@ -384,6 +384,28 @@ Bearbeitungsschritte:
 
 Die Bearbeitung ueberschreibt die vorherige Kontur nicht. Dadurch kann der User verschiedene Staerken ausprobieren.
 
+### Was macht das Chaikin-Verfahren?
+
+Das Chaikin-Verfahren ist ein einfaches Verfahren zum Abrunden einer Polygonlinie. Die Kontur besteht in ToolTrace aus vielen geraden Strecken zwischen einzelnen Punkten. Kleine Messfehler oder Segmentierungszacken erzeugen dabei harte Ecken. Chaikin ersetzt jede Strecke durch zwei neue Punkte, die etwas innerhalb der alten Strecke liegen.
+
+Fuer eine Strecke von Punkt `A` nach Punkt `B` entstehen zwei neue Punkte:
+
+```text
+Q = 75 % A + 25 % B
+R = 25 % A + 75 % B
+```
+
+Die urspruenglichen Eckpunkte werden dadurch nicht direkt beibehalten. Die neue Kontur laeuft etwas weicher um die alte Kontur herum. Bei einer geschlossenen Werkzeugkontur wird dieser Schritt fuer jede Kante ausgefuehrt, auch fuer die letzte Kante zurueck zum ersten Punkt.
+
+Wirkung:
+
+* kleine Zacken werden abgerundet
+* harte Ecken werden weicher
+* die Anzahl der Punkte steigt pro Glaettungsdurchlauf
+* sehr starke Glaettung kann echte scharfe Werkzeugkanten abrunden
+
+Deshalb kombiniert ToolTrace die Glaettung optional mit einer Vereinfachung. Nach dem Glaetten kann Douglas-Peucker (`cv2.approxPolyDP`) ueberfluessige Punkte entfernen. Die Glaettung macht die Form ruhiger, die Vereinfachung reduziert danach die Punktanzahl.
+
 Wichtige Bedienlogik:
 
 * `Keine`, `Leicht`, `Mittel`, `Stark` und `Sehr stark` steuern die Anzahl der Glaettungsdurchlaeufe.

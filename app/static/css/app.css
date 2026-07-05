@@ -166,6 +166,12 @@ body {
   vector-effect: non-scaling-stroke;
 }
 
+.manual-align-contour-offset {
+  fill: none;
+  stroke: #157347;
+  stroke-width: 1.2;
+}
+
 .manual-align-line {
   stroke: #157347;
   stroke-width: 1.2;

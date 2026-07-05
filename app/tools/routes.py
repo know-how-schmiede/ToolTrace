@@ -44,6 +44,8 @@ def preview_match_for_active_contour(contour: Contour) -> tuple[str, str] | None
         return "manual_aligned_contour_preview", f"manual_aligned_contour_{contour.id}.png"
     if contour.contour_type == "smoothed":
         return "edited_contour_preview", f"edited_contour_{contour.id}.png"
+    if contour.contour_type == "offset":
+        return "offset_contour_preview", f"offset_contour_{contour.id}.png"
     return None
 
 
@@ -70,7 +72,9 @@ def index():
         previews = (
             ProcessedImage.query.join(ProcessedImage.processing_job)
             .filter(
-                ProcessedImage.image_type.in_(["manual_aligned_contour_preview", "edited_contour_preview"]),
+                ProcessedImage.image_type.in_(
+                    ["manual_aligned_contour_preview", "edited_contour_preview", "offset_contour_preview"]
+                ),
                 ProcessedImage.processing_job.has(ProcessingJob.tool_id.in_(tool_ids)),
             )
             .order_by(ProcessedImage.created_at.desc())
@@ -190,6 +194,18 @@ def detail(tool_id: int):
         .all()
     )
     active_contour = Contour.query.filter_by(tool_id=tool.id, is_active=True).order_by(Contour.created_at.desc()).first()
+    active_contour_preview = None
+    if active_contour and (preview_target := preview_match_for_active_contour(active_contour)) is not None:
+        active_contour_preview = (
+            ProcessedImage.query.join(ProcessedImage.processing_job)
+            .filter(
+                ProcessedImage.image_type == preview_target[0],
+                ProcessedImage.file_path.endswith(preview_target[1]),
+                ProcessedImage.processing_job.has(tool_id=tool.id),
+            )
+            .order_by(ProcessedImage.created_at.desc())
+            .first()
+        )
     return render_template(
         "tools/detail.html",
         tool=tool,
@@ -200,6 +216,7 @@ def detail(tool_id: int):
         contour_previews=contour_previews,
         aligned_contour_previews=aligned_contour_previews,
         active_contour=active_contour,
+        active_contour_preview=active_contour_preview,
     )
 
 
@@ -323,6 +340,66 @@ def smooth_contour(tool_id: int, contour_id: int):
     )
     db.session.commit()
     flash("Kontur wurde geglaettet und als neue Version gespeichert.", "success")
+    return redirect(url_for("tools.detail", tool_id=tool.id))
+
+
+@bp.post("/<int:tool_id>/contours/<int:contour_id>/offset")
+@login_required
+def offset_contour(tool_id: int, contour_id: int):
+    tool = ToolService().user_tool_or_404(current_user.id, tool_id)
+    contour = Contour.query.filter_by(id=contour_id, tool_id=tool.id, is_active=True).first_or_404()
+    try:
+        offset_raw = (request.form.get("offset_mm") or "").strip().replace(",", ".")
+        offset_mm = float(offset_raw)
+        geometry_data = ContourExtractionService().offset_geometry(
+            contour.geometry_data or {},
+            offset_mm=offset_mm,
+        )
+    except (TypeError, ValueError):
+        flash("Bitte waehlen Sie einen gueltigen Versatz nach aussen.", "danger")
+        return redirect(url_for("tools.detail", tool_id=tool.id))
+
+    bounding_box = geometry_data["bounding_box_mm"]
+    Contour.query.filter_by(tool_id=tool.id, is_active=True).update({"is_active": False})
+    offset_contour = Contour(
+        tool_id=tool.id,
+        processing_job_id=contour.processing_job_id,
+        parent_contour_id=contour.id,
+        version=contour.version + 1,
+        contour_type="offset",
+        geometry_data=geometry_data,
+        width_mm=bounding_box["width"],
+        height_mm=bounding_box["height"],
+        area_mm2=contour.area_mm2,
+        perimeter_mm=contour.perimeter_mm,
+        rotation_deg=contour.rotation_deg,
+        is_active=True,
+    )
+    db.session.add(offset_contour)
+    db.session.flush()
+
+    storage_root = Path(current_app.config["STORAGE_PATH"]).resolve()
+    preview_path = (
+        StorageService().tool_root(tool.user_id, tool.id)
+        / "contours"
+        / f"offset_contour_{offset_contour.id}.png"
+    )
+    preview_width, preview_height = ContourExtractionService().write_geometry_preview(
+        geometry_data,
+        preview_path,
+        style="green_outline",
+    )
+    db.session.add(
+        ProcessedImage(
+            processing_job_id=contour.processing_job_id,
+            image_type="offset_contour_preview",
+            file_path=preview_path.relative_to(storage_root).as_posix(),
+            width_px=preview_width,
+            height_px=preview_height,
+        )
+    )
+    db.session.commit()
+    flash("Versatzkontur wurde nach aussen erzeugt und als neue Version gespeichert.", "success")
     return redirect(url_for("tools.detail", tool_id=tool.id))
 
 

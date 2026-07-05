@@ -1,5 +1,23 @@
 # ToolTrace Timeline
 
+## 0.5.7 - 2026-07-05
+
+### Geaendert
+
+* Werkzeugdetailseiten bieten fuer aktive Konturen einen Button `Download SVG`.
+* SVG-Export nutzt die aktive Konturzeichnung aus der manuellen Ausrichtungsansicht.
+* Ist eine Versatzkontur aktiv, wird genau diese Versatzkontur gruen ohne Fuellung exportiert.
+* SVG-Downloads werden als Export-Datensatz gespeichert und unter dem Werkzeugordner abgelegt.
+
+## 0.5.6 - 2026-07-05
+
+### Geaendert
+
+* Aktive Konturen koennen als neue Versatzkontur nach aussen erweitert werden.
+* Der User waehlt den Versatz in Millimetern ueber eine Auswahlbox auf der Werkzeugdetailseite.
+* Versatzkonturen werden als neue aktive Konturversion gespeichert.
+* Die Versatzkontur wird als gruene Linie ohne Fuellung gerendert und als Bibliotheksvorschau verwendet.
+
 ## 0.5.5 - 2026-07-05
 
 ### Geaendert

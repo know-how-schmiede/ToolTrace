@@ -8,6 +8,9 @@
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('tools.index') }}">Zur Bibliothek</a>
+    {% if active_contour %}
+      <a class="btn btn-success" href="{{ url_for('exports.download_tool_svg', tool_id=tool.id) }}">Download SVG</a>
+    {% endif %}
     <form method="post" action="{{ url_for('tools.delete', tool_id=tool.id) }}" onsubmit="return confirm('Werkzeug und alle zugehoerigen Daten und Dateien wirklich loeschen?');">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-outline-danger" type="submit">Werkzeug loeschen</button>
@@ -81,9 +84,9 @@
         <p class="text-secondary">Noch keine Aussenkontur erzeugt.</p>
       {% endif %}
       {% if aligned_contour_previews %}
-        {% set aligned_contour_preview = aligned_contour_previews[0] %}
+        {% set aligned_contour_preview = active_contour_preview or aligned_contour_previews[0] %}
         <h3 class="h5 mt-3">Ausrichtung und Bounding Box</h3>
-        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=aligned_contour_preview.id) }}" alt="Ausgerichtete Aussenkontur mit Bounding Box und Koordinatenachsen">
+        <img class="detail-thumb" src="{{ url_for('tools.processed_image', tool_id=tool.id, processed_image_id=aligned_contour_preview.id) }}" alt="Aktive Aussenkontur mit Bounding Box und Koordinatenachsen">
         {% if active_contour %}
           <dl class="row mt-2 mb-0 text-secondary">
             <dt class="col-sm-4">Breite</dt><dd class="col-sm-8">{{ "%.1f"|format(active_contour.width_mm) }} mm</dd>
@@ -97,11 +100,39 @@
                 bei {{ "%.1f"|format(active_contour.geometry_data.raster_bounding_box_mm.grid_size) }} mm
               </dd>
             {% endif %}
+            {% if active_contour.geometry_data and active_contour.geometry_data.offset %}
+              <dt class="col-sm-4">Versatz</dt>
+              <dd class="col-sm-8">
+                {{ "%.1f"|format(active_contour.geometry_data.offset.distance_mm) }} mm nach aussen
+              </dd>
+            {% endif %}
           </dl>
         {% endif %}
       {% endif %}
       {% if active_contour and active_contour.geometry_data and active_contour.geometry_data.points_mm %}
         {% set contour_bbox = active_contour.geometry_data.bounding_box_mm %}
+        <div class="mt-4">
+          <h3 class="h5">Versatzkontur nach aussen</h3>
+          <form method="post" action="{{ url_for('tools.offset_contour', tool_id=tool.id, contour_id=active_contour.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-2 align-items-end">
+              <div class="col-sm-8">
+                <label class="form-label" for="offsetMm">Versatz</label>
+                <select class="form-select" id="offsetMm" name="offset_mm">
+                  <option value="0.5">0,5 mm</option>
+                  <option value="1.0" selected>1,0 mm</option>
+                  <option value="1.5">1,5 mm</option>
+                  <option value="2.0">2,0 mm</option>
+                  <option value="3.0">3,0 mm</option>
+                  <option value="5.0">5,0 mm</option>
+                </select>
+              </div>
+              <div class="col-sm-4">
+                <button class="btn btn-outline-success w-100" type="submit">Erzeugen</button>
+              </div>
+            </div>
+          </form>
+        </div>
         <div class="mt-4">
           <h3 class="h5">Kontur glaetten und vereinfachen</h3>
           <form method="post" action="{{ url_for('tools.smooth_contour', tool_id=tool.id, contour_id=active_contour.id) }}">
@@ -153,7 +184,7 @@
                 <rect x="0" y="0" width="{{ contour_bbox.width }}" height="{{ contour_bbox.height }}" class="manual-align-bbox"></rect>
                 <polygon
                   id="manualAlignContour"
-                  class="manual-align-contour"
+                  class="manual-align-contour{% if active_contour.contour_type == 'offset' %} manual-align-contour-offset{% endif %}"
                   points="{% for point in active_contour.geometry_data.points_mm %}{{ point[0] }},{{ contour_bbox.height - point[1] }} {% endfor %}"
                 ></polygon>
                 <line id="manualAlignLine" class="manual-align-line" x1="0" y1="0" x2="0" y2="0"></line>

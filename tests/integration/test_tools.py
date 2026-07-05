@@ -5,7 +5,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw
 
 from app.extensions import db
-from app.models import Contour, ProcessedImage, ProcessingJob, SourceImage, Tool, User
+from app.models import Contour, Export, ProcessedImage, ProcessingJob, SourceImage, Tool, User
 from app.tools.services import StorageService, ToolService
 from tests.conftest import register_and_login
 
@@ -367,6 +367,80 @@ def test_user_can_smooth_active_contour_and_library_uses_preview(client, app):
     html = index_response.get_data(as_text=True)
     assert edited_preview_url not in html
     assert source_image_url in html
+
+
+def test_user_can_create_outward_offset_contour_and_library_uses_preview(client, app):
+    register_and_login(client)
+    image_bytes = make_page_image_bytes()
+
+    client.post(
+        "/tools/new",
+        data={
+            "name": "Versatz-Test",
+            "category_id": "0",
+            "background_key": "light_table_a4",
+            "image": (image_bytes, "versatz.png"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    with app.app_context():
+        tool = Tool.query.filter_by(name="Versatz-Test").one()
+        active_contour = Contour.query.filter_by(tool_id=tool.id, is_active=True).one()
+        original_width = active_contour.width_mm
+        original_height = active_contour.height_mm
+        tool_id = tool.id
+        contour_id = active_contour.id
+
+    response = client.post(
+        f"/tools/{tool_id}/contours/{contour_id}/offset",
+        data={"offset_mm": "1,5"},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "Versatzkontur wurde nach aussen erzeugt" in response.get_data(as_text=True)
+
+    with app.app_context():
+        contours = Contour.query.filter_by(tool_id=tool_id).order_by(Contour.version.asc()).all()
+        offset_contour = Contour.query.filter_by(tool_id=tool_id, is_active=True).one()
+        offset_preview = ProcessedImage.query.filter_by(image_type="offset_contour_preview").one()
+        assert len(contours) == 2
+        assert contours[0].is_active is False
+        assert offset_contour.contour_type == "offset"
+        assert offset_contour.parent_contour_id == contour_id
+        assert offset_contour.geometry_data["offset"]["distance_mm"] == 1.5
+        assert offset_contour.width_mm > original_width
+        assert offset_contour.height_mm > original_height
+        offset_contour_id = offset_contour.id
+        offset_preview_url = f"/tools/{tool_id}/processed-images/{offset_preview.id}"
+
+    index_response = client.get("/tools/")
+    assert offset_preview_url in index_response.get_data(as_text=True)
+
+    detail_response = client.get(f"/tools/{tool_id}")
+    detail_html = detail_response.get_data(as_text=True)
+    assert offset_preview_url in detail_html
+    assert "manual-align-contour-offset" in detail_html
+    assert "Download SVG" in detail_html
+
+    export_response = client.get(f"/exports/tools/{tool_id}/svg")
+    export_text = export_response.get_data(as_text=True)
+    assert export_response.status_code == 200
+    assert export_response.mimetype == "image/svg+xml"
+    assert "attachment" in export_response.headers["Content-Disposition"]
+    assert 'id="manual-align-export"' in export_text
+    assert 'id="offset-contour"' in export_text
+    assert 'fill="none"' in export_text
+    assert 'stroke="#157347"' in export_text
+
+    with app.app_context():
+        export = Export.query.filter_by(tool_id=tool_id, contour_id=offset_contour_id).one()
+        assert export.export_type == "svg"
+        assert export.filename.endswith(".svg")
+        assert export.options_json["source"] == "manual_align_view"
+        assert export.options_json["contour_type"] == "offset"
 
 
 def test_small_image_upload_is_saved_with_warning(client, app):

@@ -124,3 +124,25 @@ def test_smooth_geometry_creates_new_simplified_points():
     assert smoothed["bounding_box_mm"]["height"] > 0
     assert min(point[0] for point in smoothed["points_mm"]) == 0
     assert min(point[1] for point in smoothed["points_mm"]) == 0
+
+
+def test_offset_geometry_expands_contour_outwards():
+    geometry_data = {
+        "type": "outer_contour",
+        "coordinate_space": "tool_mm",
+        "origin": "bottom_left",
+        "axis": {"x": "right", "y": "up"},
+        "points_mm": [[0, 0], [30, 0], [30, 12], [0, 12]],
+        "bounding_box_mm": {"x": 0, "y": 0, "width": 30, "height": 12},
+    }
+
+    offset = ContourExtractionService().offset_geometry(geometry_data, offset_mm=2.0)
+
+    assert offset["offset"]["method"] == "raster_dilate_external"
+    assert offset["offset"]["distance_mm"] == 2.0
+    assert offset["offset"]["source_point_count"] == 4
+    assert offset["offset"]["result_point_count"] >= 4
+    assert offset["bounding_box_mm"]["width"] > geometry_data["bounding_box_mm"]["width"]
+    assert offset["bounding_box_mm"]["height"] > geometry_data["bounding_box_mm"]["height"]
+    assert min(point[0] for point in offset["points_mm"]) == 0
+    assert min(point[1] for point in offset["points_mm"]) == 0
